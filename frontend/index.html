@@ -216,7 +216,8 @@
             document.getElementById("setup-screen").style.display = "none";
             document.getElementById("chat-interface").style.display = "flex";
 
-            ws = new WebSocket(`ws://localhost:8000/ws/${encodeURIComponent(myUsername)}`);
+            // Use 'wss://' (Secure WebSocket) for https links
+            ws = new WebSocket(`wss://ai-wars.onrender.com/ws/${encodeURIComponent(myUsername)}`);
 
             ws.onmessage = (event) => {
                 const data = JSON.parse(event.data);
