@@ -6,20 +6,32 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AI Squad Chat + Rooms</title>
     <style>
+        * { box-sizing: border-box; }
         body {
             font-family: 'Segoe UI', sans-serif;
             background: #1e1e2e;
             color: #cdd6f4;
             display: flex;
             justify-content: center;
-            padding-top: 50px;
+            padding-top: 30px;
+            padding-bottom: 30px;
+            min-height: 100vh;
         }
 
+        .app-wrapper {
+            display: flex;
+            gap: 20px;
+            align-items: flex-start;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        /* ===== CHAT ===== */
         .chat-container {
-            width: 650px;
+            width: 480px;
             background: #313244;
             border-radius: 12px;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
             overflow: hidden;
             display: flex;
             flex-direction: column;
@@ -38,7 +50,7 @@
         }
 
         .chat-box {
-            height: 500px;
+            height: 480px;
             padding: 20px;
             overflow-y: auto;
             display: flex;
@@ -89,20 +101,14 @@
             font-size: 0.9em;
         }
 
-        .Me {
-            align-self: flex-end;
-        }
-
+        .Me { align-self: flex-end; }
         .Me .message {
             background: #cba6f7;
             color: #11111b;
             border-bottom-right-radius: 0;
         }
 
-        .Others {
-            align-self: flex-start;
-        }
-
+        .Others { align-self: flex-start; }
         .Others .message {
             background: #45475a;
             border-bottom-left-radius: 0;
@@ -118,6 +124,18 @@
             background: #89b4fa;
             color: #11111b;
             font-weight: 500;
+        }
+
+        .game-event-msg {
+            align-self: center;
+            text-align: center;
+            font-style: italic;
+            color: #f9e2af;
+            font-size: 0.85em;
+            background: #2a2a3e;
+            border-radius: 8px;
+            padding: 6px 12px;
+            border: 1px solid #45475a;
         }
 
         .input-area {
@@ -150,9 +168,7 @@
             transition: 0.2s;
         }
 
-        .upload-btn:hover {
-            background: #585b70;
-        }
+        .upload-btn:hover { background: #585b70; }
 
         button.send-btn {
             padding: 12px 20px;
@@ -164,9 +180,7 @@
             font-weight: bold;
         }
 
-        button.send-btn:hover {
-            background: #b4befe;
-        }
+        button.send-btn:hover { background: #b4befe; }
 
         #setup-screen {
             display: flex;
@@ -185,151 +199,1081 @@
             border: none;
             font-size: 1em;
         }
+
+        /* ===== LUDO GAME PANEL ===== */
+        .ludo-panel {
+            width: 520px;
+            background: #313244;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .ludo-header {
+            background: #181825;
+            padding: 15px;
+            border-bottom: 2px solid #f38ba8;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-weight: bold;
+            font-size: 1.1em;
+        }
+
+        .ludo-body {
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+        }
+
+        /* LUDO BOARD */
+        .ludo-board {
+            display: grid;
+            grid-template-columns: repeat(15, 32px);
+            grid-template-rows: repeat(15, 32px);
+            gap: 1px;
+            background: #11111b;
+            border: 3px solid #585b70;
+            border-radius: 8px;
+            padding: 2px;
+            position: relative;
+        }
+
+        .ludo-cell {
+            width: 32px;
+            height: 32px;
+            background: #1e1e2e;
+            border-radius: 3px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            position: relative;
+            cursor: default;
+        }
+
+        /* Home zones */
+        .home-red    { background: #f38ba8 !important; }
+        .home-green  { background: #a6e3a1 !important; }
+        .home-yellow { background: #f9e2af !important; }
+        .home-blue   { background: #89b4fa !important; }
+
+        /* Safe star cells */
+        .safe-cell { background: #313244 !important; }
+        .safe-cell::after { content: '★'; font-size: 12px; color: #f9e2af; }
+
+        /* Center home column/row safe paths */
+        .path-red    { background: #f38ba8aa !important; }
+        .path-green  { background: #a6e3a1aa !important; }
+        .path-yellow { background: #f9e2afaa !important; }
+        .path-blue   { background: #89b4faaa !important; }
+
+        /* Center winning triangle */
+        .center-cell {
+            background: linear-gradient(135deg, #f38ba8 0%, #89b4fa 50%, #a6e3a1 100%) !important;
+            border-radius: 50%;
+        }
+
+        /* Token */
+        .token {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            border: 2px solid rgba(0,0,0,0.4);
+            position: absolute;
+            font-size: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            color: #11111b;
+            cursor: pointer;
+            transition: transform 0.2s;
+            z-index: 10;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.5);
+        }
+
+        .token:hover { transform: scale(1.3); }
+        .token.movable { 
+            animation: pulse 0.8s infinite alternate;
+            cursor: pointer;
+            border: 2px solid #fff;
+        }
+
+        @keyframes pulse {
+            from { box-shadow: 0 0 0 0 rgba(255,255,255,0.5); }
+            to   { box-shadow: 0 0 0 6px rgba(255,255,255,0); }
+        }
+
+        .token-red    { background: #f38ba8; }
+        .token-green  { background: #a6e3a1; }
+        .token-yellow { background: #f9e2af; }
+        .token-blue   { background: #89b4fa; }
+
+        /* Controls */
+        .ludo-controls {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .dice-box {
+            width: 60px;
+            height: 60px;
+            background: #1e1e2e;
+            border: 2px solid #cba6f7;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2em;
+            cursor: pointer;
+            transition: transform 0.1s, background 0.2s;
+            user-select: none;
+        }
+
+        .dice-box:hover:not(.disabled) { background: #45475a; }
+        .dice-box:active:not(.disabled) { transform: scale(0.9); }
+        .dice-box.disabled { opacity: 0.4; cursor: not-allowed; }
+        .dice-box.rolling { animation: roll 0.4s ease; }
+        @keyframes roll {
+            0%   { transform: rotate(0deg) scale(1); }
+            25%  { transform: rotate(-20deg) scale(1.2); }
+            50%  { transform: rotate(20deg) scale(0.9); }
+            75%  { transform: rotate(-10deg) scale(1.1); }
+            100% { transform: rotate(0deg) scale(1); }
+        }
+
+        .turn-indicator {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .player-badge {
+            width: 24px; height: 24px;
+            border-radius: 50%;
+            border: 2px solid transparent;
+            display: inline-block;
+        }
+
+        .player-badge.active {
+            border-color: #fff;
+            box-shadow: 0 0 8px rgba(255,255,255,0.6);
+        }
+
+        .ludo-status {
+            font-size: 0.9em;
+            color: #a6adc8;
+            text-align: center;
+            min-height: 20px;
+        }
+
+        .ludo-log {
+            width: 100%;
+            height: 80px;
+            background: #1e1e2e;
+            border-radius: 6px;
+            padding: 8px;
+            font-size: 0.78em;
+            overflow-y: auto;
+            color: #a6adc8;
+            border: 1px solid #45475a;
+        }
+
+        .btn-game {
+            padding: 8px 16px;
+            background: #f38ba8;
+            color: #11111b;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 0.9em;
+        }
+
+        .btn-game:hover { background: #eb6f92; }
+
+        .player-labels {
+            display: flex;
+            gap: 15px;
+            font-size: 0.8em;
+        }
+
+        .player-label { display: flex; align-items: center; gap: 5px; }
+        .dot { width: 12px; height: 12px; border-radius: 50%; }
+
+        .winner-banner {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.85);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            border-radius: 6px;
+            z-index: 50;
+            gap: 10px;
+            font-size: 1.5em;
+            font-weight: bold;
+        }
+
+        .ai-thinking {
+            font-size: 0.8em;
+            color: #a6e3a1;
+            font-style: italic;
+            animation: blink 1s infinite;
+        }
+        @keyframes blink { 50% { opacity: 0.3; } }
     </style>
 </head>
 
 <body>
 
+<div class="app-wrapper">
+
+    <!-- CHAT -->
     <div class="chat-container">
         <div class="header">
             <span>🤖 Squad Chat</span>
-            <span id="room-display" style="font-size: 0.8em; opacity: 0.7; color: #cba6f7;"></span>
+            <span id="room-display" style="font-size:0.8em;opacity:0.7;color:#cba6f7;"></span>
         </div>
 
         <div id="setup-screen">
             <h2>Join a Squad</h2>
             <input type="text" id="username-input" class="setup-input" placeholder="Your Username">
             <input type="text" id="room-input" class="setup-input" placeholder="Room ID (e.g. 101)">
-            <button class="send-btn" onclick="joinChat()" style="width: 250px;">Enter Room</button>
+            <button class="send-btn" onclick="joinChat()" style="width:250px;">Enter Room</button>
         </div>
 
-        <div id="chat-interface" style="display: none; flex-direction: column; height: 100%;">
+        <div id="chat-interface" style="display:none;flex-direction:column;height:100%;">
             <div class="chat-box" id="chat-box"></div>
             <div class="input-area">
-                <input type="file" id="file-input" accept="image/*" style="display: none;"
-                    onchange="handleFileUpload(this)">
-
-                <div class="upload-btn" onclick="document.getElementById('file-input').click()" title="Upload Image">📷
-                </div>
-
+                <input type="file" id="file-input" accept="image/*" style="display:none;" onchange="handleFileUpload(this)">
+                <div class="upload-btn" onclick="document.getElementById('file-input').click()" title="Upload Image">📷</div>
                 <input type="text" id="message-input" placeholder="Type..." onkeypress="handleKeyPress(event)">
                 <button class="send-btn" onclick="sendMessage()">Send</button>
             </div>
         </div>
     </div>
 
-    <script>
-        let ws;
-        let myUsername = "";
-        let myRoom = "";
+    <!-- LUDO GAME -->
+    <div class="ludo-panel" id="ludo-panel">
+        <div class="ludo-header">
+            <span>🎲 Ludo – Multiplayer</span>
+            <div class="player-labels">
+                <div class="player-label"><div class="dot" style="background:#f38ba8"></div>You</div>
+                <div class="player-label"><div class="dot" style="background:#a6e3a1"></div>Groq</div>
+                <div class="player-label"><div class="dot" style="background:#89b4fa"></div>Router</div>
+            </div>
+        </div>
+        <div class="ludo-body">
+            <div class="ludo-controls">
+                <div class="dice-box disabled" id="dice-box" onclick="rollDice()">🎲</div>
+                <div>
+                    <div class="ludo-status" id="ludo-status">Connect to a room to play!</div>
+                    <div class="turn-indicator" id="turn-indicator"></div>
+                </div>
+                <button class="btn-game" onclick="resetGame()">New Game</button>
+            </div>
 
-        function joinChat() {
-            myUsername = document.getElementById("username-input").value.trim();
-            myRoom = document.getElementById("room-input").value.trim();
+            <div style="position:relative;">
+                <div class="ludo-board" id="ludo-board"></div>
+                <div class="winner-banner" id="winner-banner" style="display:none;"></div>
+            </div>
 
-            if (!myUsername || !myRoom) return alert("Enter both Name and Room ID!");
+            <div class="ludo-log" id="ludo-log">Game log will appear here...<br></div>
+        </div>
+    </div>
 
-            document.getElementById("setup-screen").style.display = "none";
-            document.getElementById("chat-interface").style.display = "flex";
-            document.getElementById("room-display").innerText = "Room: " + myRoom;
+</div>
 
-            // Connect to ROOM-SPECIFIC WebSocket URL
-            // CHANGE THIS URL IF DEPLOYED (e.g., wss://your-app.onrender.com)
-            // If testing locally, keep ws://localhost:8000
-            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-            // const host = "localhost:8000"; // UNCOMMENT FOR LOCAL
-            const host = "ai-wars.onrender.com"; // UNCOMMENT FOR PROD (Use your actual Render URL)
+<script>
+// ============================================================
+// CHAT LOGIC
+// ============================================================
+let ws;
+let myUsername = "";
+let myRoom = "";
 
-            ws = new WebSocket(`${protocol}//${host}/ws/${encodeURIComponent(myRoom)}/${encodeURIComponent(myUsername)}`);
+function joinChat() {
+    myUsername = document.getElementById("username-input").value.trim();
+    myRoom = document.getElementById("room-input").value.trim();
+    if (!myUsername || !myRoom) return alert("Enter both Name and Room ID!");
 
-            ws.onmessage = (event) => {
-                const data = JSON.parse(event.data);
-                appendMessage(data.sender, data.message, data.image);
-            };
+    document.getElementById("setup-screen").style.display = "none";
+    document.getElementById("chat-interface").style.display = "flex";
+    document.getElementById("room-display").innerText = "Room: " + myRoom;
 
-            ws.onclose = () => appendMessage("System", "Connection lost. Please refresh.");
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const host = "ai-wars.onrender.com";
+    ws = new WebSocket(`${protocol}//${host}/ws/${encodeURIComponent(myRoom)}/${encodeURIComponent(myUsername)}`);
+
+    ws.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+        
+        // Check if it's a game state message
+        if (data.message && data.message.startsWith("__LUDO__:")) {
+            handleRemoteGameState(data);
+            return;
         }
+        
+        appendMessage(data.sender, data.message, data.image);
+    };
 
-        // --- FILE UPLOAD LOGIC ---
-        function handleFileUpload(input) {
-            const file = input.files[0];
-            if (!file) return;
+    ws.onclose = () => appendMessage("System", "Connection lost. Please refresh.");
+    
+    // Assign player color after joining
+    setTimeout(() => {
+        ludoAssignPlayer(myUsername);
+        updateTurnIndicator();
+    }, 500);
+}
 
-            if (file.size > 2 * 1024 * 1024) {
-                alert("File too big! Keep it under 2MB for the AI.");
-                return;
-            }
+function handleFileUpload(input) {
+    const file = input.files[0];
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) { alert("File too big! Keep it under 2MB."); return; }
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        ws.send(JSON.stringify({ sender: myUsername, message: "", image: e.target.result }));
+    };
+    reader.readAsDataURL(file);
+    input.value = "";
+}
 
-            const reader = new FileReader();
-            reader.onload = function (e) {
-                const base64Image = e.target.result;
+function sendMessage() {
+    const input = document.getElementById("message-input");
+    const text = input.value.trim();
+    if (!text) return;
+    ws.send(JSON.stringify({ sender: myUsername, message: text, image: null }));
+    input.value = '';
+}
 
-                // Send image via WebSocket
-                ws.send(JSON.stringify({
-                    sender: myUsername,
-                    message: "",
-                    image: base64Image
-                }));
-            };
-            reader.readAsDataURL(file);
-            input.value = "";
+function appendMessage(sender, text, image) {
+    const chatBox = document.getElementById("chat-box");
+    const msgWrapper = document.createElement("div");
+
+    let typeClass = "Others";
+    if (sender === "System") typeClass = "System";
+    else if (sender === myUsername) typeClass = "Me";
+    else if (sender.includes("Groq")) typeClass = "Groq-AI";
+    else if (sender.includes("Router")) typeClass = "Router-AI";
+
+    msgWrapper.className = `message-wrapper ${typeClass}`;
+
+    if (typeClass !== "System" && typeClass !== "Me") {
+        const nameDiv = document.createElement("div");
+        nameDiv.className = "sender-name";
+        nameDiv.textContent = sender;
+        msgWrapper.appendChild(nameDiv);
+    }
+
+    const bubbleDiv = document.createElement("div");
+    bubbleDiv.className = "message";
+
+    if (image) {
+        const img = document.createElement("img");
+        img.src = image;
+        bubbleDiv.appendChild(img);
+        if (text && text.includes("Vision AI analysis")) {
+            const analysisText = text.split("Vision AI analysis: ")[1]?.replace("]", "") || "Analyzing...";
+            const caption = document.createElement("div");
+            caption.className = "vision-caption";
+            caption.innerText = "👀 AI sees: " + analysisText;
+            bubbleDiv.appendChild(caption);
         }
+    } else {
+        bubbleDiv.textContent = text;
+    }
 
-        function sendMessage() {
-            const input = document.getElementById("message-input");
-            const text = input.value.trim();
-            if (!text) return;
+    msgWrapper.appendChild(bubbleDiv);
+    chatBox.appendChild(msgWrapper);
+    chatBox.scrollTop = chatBox.scrollHeight;
+}
 
-            ws.send(JSON.stringify({ sender: myUsername, message: text, image: null }));
-            input.value = '';
+function handleKeyPress(e) { if (e.key === "Enter") sendMessage(); }
+
+// ============================================================
+// LUDO GAME ENGINE
+// ============================================================
+
+// Board layout: 15x15 grid
+// Players: red=You, green=Groq-AI, blue=Router-AI, yellow=AI3(optional)
+// Each player has 4 tokens, starts in home, moves along track
+
+// Standard Ludo path for each color (as [row, col] on 15x15 grid)
+// Track positions 0-51 (52 steps), plus 6 home stretch steps = 58 total positions
+// Position -1 = in home base (not on board), 57 = won
+
+const COLORS = ['red', 'green', 'blue', 'yellow'];
+const COLOR_EMOJI = { red: '🔴', green: '🟢', blue: '🔵', yellow: '🟡' };
+const DICE_FACES = ['⚀','⚁','⚂','⚃','⚄','⚅'];
+
+// Ludo 15x15 path coordinates
+// Common path (52 cells), then each color's home stretch (6 cells)
+// Coordinates: [row, col], 0-indexed
+
+// Main track (clockwise starting from red's entry)
+const MAIN_TRACK = [
+    [6,1],[6,2],[6,3],[6,4],[6,5],
+    [5,6],[4,6],[3,6],[2,6],[1,6],[0,6],
+    [0,7],
+    [0,8],[1,8],[2,8],[3,8],[4,8],[5,8],
+    [6,9],[6,10],[6,11],[6,12],[6,13],[6,14],
+    [7,14],
+    [8,14],[8,13],[8,12],[8,11],[8,10],[8,9],
+    [9,8],[10,8],[11,8],[12,8],[13,8],[14,8],
+    [14,7],
+    [14,6],[13,6],[12,6],[11,6],[10,6],[9,6],
+    [8,5],[8,4],[8,3],[8,2],[8,1],[8,0],
+    [7,0]
+    // token wraps back to index 0 next step = position 52 = home entry
+];
+// 52 cells total (indices 0-51), index 52 would be back to start
+
+// Each color's starting position on main track (index into MAIN_TRACK)
+const START_POS = { red: 0, green: 13, blue: 26, yellow: 39 };
+
+// Each color's home stretch coords (index 0..5, index 5 = goal center approach)
+const HOME_STRETCH = {
+    red:    [[7,1],[7,2],[7,3],[7,4],[7,5],[7,6]],
+    green:  [[1,7],[2,7],[3,7],[4,7],[5,7],[6,7]],
+    blue:   [[7,13],[7,12],[7,11],[7,10],[7,9],[7,8]],
+    yellow: [[13,7],[12,7],[11,7],[10,7],[9,7],[8,7]]
+};
+
+// Center (winning cell)
+const CENTER = [7,7];
+
+// Home base positions (where tokens sit before entering board)
+const HOME_BASE = {
+    red:    [[1,1],[2,1],[1,2],[2,2]],
+    green:  [[1,12],[2,12],[1,13],[2,13]],
+    blue:   [[12,12],[13,12],[12,13],[13,13]],
+    yellow: [[12,1],[13,1],[12,2],[13,2]]
+};
+
+// Safe cells (main track indices) - standard Ludo safe spots
+const SAFE_INDICES = [0, 8, 13, 21, 26, 34, 39, 47];
+
+// Color entry index onto home stretch: when token reaches entry_index on main track, next move goes to home stretch
+const HOME_ENTRY = {
+    red:    51, // index 51 on main track => next step goes to home stretch[0]
+    green:  12,
+    blue:   25,
+    yellow: 38
+};
+
+// Game state
+let gameState = {
+    players: {
+        red:    { name: 'You', isAI: false, tokens: [[-1,0],[-1,1],[-1,2],[-1,3]] },
+        green:  { name: 'Groq-AI', isAI: true,  tokens: [[-1,0],[-1,1],[-1,2],[-1,3]] },
+        blue:   { name: 'Router-AI', isAI: true, tokens: [[-1,0],[-1,1],[-1,2],[-1,3]] },
+        yellow: { name: 'Bot4', isAI: true, tokens: [[-1,0],[-1,1],[-1,2],[-1,3]] }
+    },
+    // Token positions: -1 = home base, 0-51 = main track index, 100+i = home stretch index i, 200 = goal
+    tokenPos: {
+        red:    [-1,-1,-1,-1],
+        green:  [-1,-1,-1,-1],
+        blue:   [-1,-1,-1,-1],
+        yellow: [-1,-1,-1,-1]
+    },
+    currentTurn: 'red', // whose turn
+    turnOrder: ['red','green','blue','yellow'],
+    diceValue: null,
+    diceRolled: false,
+    movablePieces: [],
+    winner: null,
+    activePlayers: ['red','green','blue'], // 3 players: user, groq, router
+    gameStarted: false
+};
+
+let myColor = 'red'; // user is always red
+let isMyTurn = false;
+let aiMoveTimeout = null;
+
+// Token position encoding:
+// -1 = in base
+// 0..51 = main track index (relative to START_POS[color])
+// 100..105 = home stretch (0..5)
+// 200 = goal (won)
+
+function getAbsoluteTrackIndex(color, relPos) {
+    // Convert relative position (0-51) to absolute main track index
+    return (START_POS[color] + relPos) % 52;
+}
+
+function getCellCoord(color, tokenRelPos) {
+    if (tokenRelPos === -1) return null; // in base
+    if (tokenRelPos === 200) return CENTER;
+    if (tokenRelPos >= 100) {
+        const homeIdx = tokenRelPos - 100;
+        return HOME_STRETCH[color][homeIdx];
+    }
+    // Main track
+    const absIdx = getAbsoluteTrackIndex(color, tokenRelPos);
+    return MAIN_TRACK[absIdx];
+}
+
+function canMove(color, tokenIdx, dice) {
+    const pos = gameState.tokenPos[color][tokenIdx];
+    if (pos === 200) return false; // already won
+    if (pos === -1) return dice === 6; // need 6 to enter
+    
+    // In home stretch
+    if (pos >= 100) {
+        const stretchPos = pos - 100;
+        const newStretch = stretchPos + dice;
+        return newStretch <= 5; // can't overshoot
+    }
+    
+    // On main track
+    // Check if token is about to enter home stretch
+    const absIdx = getAbsoluteTrackIndex(color, pos);
+    const homeEntryAbs = HOME_ENTRY[color];
+    
+    // How many steps to home entry?
+    let stepsToEntry;
+    if (homeEntryAbs >= absIdx) stepsToEntry = homeEntryAbs - absIdx;
+    else stepsToEntry = 52 - absIdx + homeEntryAbs;
+
+    // Need stepsToEntry+1 to enter home stretch at index 0, up to stepsToEntry+6 to finish
+    if (dice <= stepsToEntry) return true; // still on main track
+    
+    // Entering home stretch
+    const homeIdx = dice - stepsToEntry - 1;
+    return homeIdx <= 5; // valid home stretch position
+}
+
+function moveToken(color, tokenIdx, dice) {
+    let pos = gameState.tokenPos[color][tokenIdx];
+    
+    if (pos === -1 && dice === 6) {
+        // Enter board at relative position 0
+        gameState.tokenPos[color][tokenIdx] = 0;
+        return;
+    }
+    
+    if (pos >= 100) {
+        // In home stretch
+        const newPos = pos + dice;
+        if (newPos - 100 === 5) {
+            gameState.tokenPos[color][tokenIdx] = 200; // goal!
+        } else {
+            gameState.tokenPos[color][tokenIdx] = newPos;
         }
-
-        function appendMessage(sender, text, image) {
-            const chatBox = document.getElementById("chat-box");
-            const msgWrapper = document.createElement("div");
-
-            let typeClass = "Others";
-            if (sender === "System") typeClass = "System";
-            else if (sender === myUsername) typeClass = "Me";
-            else if (sender.includes("Groq")) typeClass = "Groq-AI";
-            else if (sender.includes("Router")) typeClass = "Router-AI";
-
-            msgWrapper.className = `message-wrapper ${typeClass}`;
-
-            if (typeClass !== "System" && typeClass !== "Me") {
-                const nameDiv = document.createElement("div");
-                nameDiv.className = "sender-name";
-                nameDiv.textContent = sender;
-                msgWrapper.appendChild(nameDiv);
-            }
-
-            const bubbleDiv = document.createElement("div");
-            bubbleDiv.className = "message";
-
-            // --- IMAGE RENDERING ---
-            if (image) {
-                const img = document.createElement("img");
-                img.src = image;
-                bubbleDiv.appendChild(img);
-
-                if (text && text.includes("Vision AI analysis")) {
-                    const analysisText = text.split("Vision AI analysis: ")[1]?.replace("]", "") || "Analyzing...";
-                    const caption = document.createElement("div");
-                    caption.className = "vision-caption";
-                    caption.innerText = "👀 AI sees: " + analysisText;
-                    bubbleDiv.appendChild(caption);
+        return;
+    }
+    
+    // On main track
+    const absIdx = getAbsoluteTrackIndex(color, pos);
+    const homeEntryAbs = HOME_ENTRY[color];
+    
+    let stepsToEntry;
+    if (homeEntryAbs >= absIdx) stepsToEntry = homeEntryAbs - absIdx;
+    else stepsToEntry = 52 - absIdx + homeEntryAbs;
+    
+    if (dice <= stepsToEntry) {
+        // Stay on main track
+        gameState.tokenPos[color][tokenIdx] = pos + dice;
+    } else {
+        // Enter home stretch
+        const homeIdx = dice - stepsToEntry - 1;
+        gameState.tokenPos[color][tokenIdx] = 100 + homeIdx;
+    }
+    
+    // Check capture: if another non-safe token is on same cell, send it home
+    const newPos = gameState.tokenPos[color][tokenIdx];
+    if (newPos >= 0 && newPos < 100) {
+        const absNew = getAbsoluteTrackIndex(color, newPos);
+        const isSafe = SAFE_INDICES.includes(absNew);
+        if (!isSafe) {
+            for (const otherColor of gameState.activePlayers) {
+                if (otherColor === color) continue;
+                for (let ti = 0; ti < 4; ti++) {
+                    const otherPos = gameState.tokenPos[otherColor][ti];
+                    if (otherPos < 0 || otherPos >= 100) continue;
+                    const otherAbs = getAbsoluteTrackIndex(otherColor, otherPos);
+                    if (otherAbs === absNew) {
+                        // Capture!
+                        gameState.tokenPos[otherColor][ti] = -1;
+                        logGame(`${color} captured ${otherColor}'s token! 💥`);
+                        return; // extra turn handled elsewhere
+                    }
                 }
-            } else {
-                bubbleDiv.textContent = text;
             }
-
-            msgWrapper.appendChild(bubbleDiv);
-            chatBox.appendChild(msgWrapper);
-            chatBox.scrollTop = chatBox.scrollHeight;
         }
+    }
+}
 
-        function handleKeyPress(e) { if (e.key === "Enter") sendMessage(); }
-    </script>
+function getMovable(color, dice) {
+    const movable = [];
+    for (let i = 0; i < 4; i++) {
+        if (canMove(color, i, dice)) movable.push(i);
+    }
+    return movable;
+}
+
+function checkWinner(color) {
+    return gameState.tokenPos[color].every(p => p === 200);
+}
+
+// ============================================================
+// BOARD RENDERING
+// ============================================================
+
+function buildBoard() {
+    const board = document.getElementById('ludo-board');
+    board.innerHTML = '';
+    
+    // Create 15x15 grid of cells
+    for (let r = 0; r < 15; r++) {
+        for (let c = 0; c < 15; c++) {
+            const cell = document.createElement('div');
+            cell.className = 'ludo-cell';
+            cell.id = `cell-${r}-${c}`;
+            board.appendChild(cell);
+        }
+    }
+    
+    // Color home zones (6x6 squares minus center)
+    colorZone(0,0,5,5,'home-red');
+    colorZone(0,9,5,14,'home-green');
+    colorZone(9,9,14,14,'home-blue');
+    colorZone(9,0,14,5,'home-yellow');
+    
+    // Center cell
+    getCell(7,7).className = 'ludo-cell center-cell';
+    
+    // Home stretch paths
+    for (let i = 0; i < 6; i++) {
+        const hsr = HOME_STRETCH.red[i];    addClass(hsr[0],hsr[1],'path-red');
+        const hsg = HOME_STRETCH.green[i];  addClass(hsg[0],hsg[1],'path-green');
+        const hsb = HOME_STRETCH.blue[i];   addClass(hsb[0],hsb[1],'path-blue');
+        const hsy = HOME_STRETCH.yellow[i]; addClass(hsy[0],hsy[1],'path-yellow');
+    }
+    
+    // Safe cells
+    for (const idx of SAFE_INDICES) {
+        const [r,c] = MAIN_TRACK[idx];
+        addClass(r,c,'safe-cell');
+    }
+}
+
+function colorZone(r1,c1,r2,c2, cls) {
+    for (let r = r1; r <= r2; r++)
+        for (let c = c1; c <= c2; c++)
+            addClass(r,c,cls);
+}
+
+function getCell(r,c) { return document.getElementById(`cell-${r}-${c}`); }
+function addClass(r,c,cls) { const el = getCell(r,c); if(el) el.classList.add(cls); }
+
+function renderTokens() {
+    // Remove all existing tokens
+    document.querySelectorAll('.token').forEach(t => t.remove());
+    
+    // Track stacking on same cell
+    const cellOccupancy = {};
+    
+    for (const color of gameState.activePlayers) {
+        for (let ti = 0; ti < 4; ti++) {
+            const pos = gameState.tokenPos[color][ti];
+            
+            let coord;
+            if (pos === -1) {
+                coord = HOME_BASE[color][ti];
+            } else {
+                coord = getCellCoord(color, pos);
+                if (!coord) continue;
+            }
+            
+            const [r,c] = coord;
+            const cellKey = `${r}-${c}`;
+            if (!cellOccupancy[cellKey]) cellOccupancy[cellKey] = 0;
+            const offset = cellOccupancy[cellKey];
+            cellOccupancy[cellKey]++;
+            
+            const cell = getCell(r,c);
+            if (!cell) continue;
+            
+            const token = document.createElement('div');
+            token.className = `token token-${color}`;
+            token.textContent = ti+1;
+            token.dataset.color = color;
+            token.dataset.tokenIdx = ti;
+            
+            // Offset for stacking
+            const offX = (offset % 2) * 12 - 6;
+            const offY = Math.floor(offset / 2) * 12 - 6;
+            token.style.left = `${6 + offX}px`;
+            token.style.top  = `${6 + offY}px`;
+            
+            // Highlight movable tokens
+            if (gameState.currentTurn === color && 
+                gameState.movablePieces.includes(ti) && 
+                gameState.diceRolled) {
+                token.classList.add('movable');
+            }
+            
+            // Only user can click their own tokens
+            if (color === myColor && gameState.currentTurn === myColor && 
+                gameState.diceRolled && gameState.movablePieces.includes(ti)) {
+                token.style.cursor = 'pointer';
+                token.addEventListener('click', () => onTokenClick(ti));
+            }
+            
+            cell.appendChild(token);
+        }
+    }
+}
+
+// ============================================================
+// GAME FLOW
+// ============================================================
+
+function updateDiceAvailability() {
+    const diceBox = document.getElementById('dice-box');
+    const isMyActualTurn = gameState.currentTurn === myColor && !gameState.diceRolled && !gameState.winner && gameState.gameStarted;
+    
+    if (isMyActualTurn) {
+        diceBox.classList.remove('disabled');
+    } else {
+        diceBox.classList.add('disabled');
+    }
+}
+
+function rollDice() {
+    if (gameState.currentTurn !== myColor || gameState.diceRolled || gameState.winner) return;
+    if (!gameState.gameStarted) return;
+    
+    const val = Math.floor(Math.random() * 6) + 1;
+    gameState.diceValue = val;
+    gameState.diceRolled = true;
+    
+    const diceBox = document.getElementById('dice-box');
+    diceBox.classList.add('rolling');
+    setTimeout(() => diceBox.classList.remove('rolling'), 400);
+    diceBox.textContent = DICE_FACES[val-1];
+    
+    logGame(`🎲 You rolled a ${val}`);
+    
+    const movable = getMovable(myColor, val);
+    gameState.movablePieces = movable;
+    
+    if (movable.length === 0) {
+        logGame(`No moves available. Turn passes.`);
+        setTimeout(() => nextTurn(false), 1200);
+    } else if (movable.length === 1) {
+        // Auto-move if only one option
+        setTimeout(() => onTokenClick(movable[0]), 500);
+    } else {
+        updateStatus(`Click a glowing token to move!`);
+        renderTokens();
+    }
+    
+    broadcastGameState(`${myUsername} rolled a ${val}`);
+    updateDiceAvailability();
+}
+
+function onTokenClick(tokenIdx) {
+    if (gameState.currentTurn !== myColor) return;
+    if (!gameState.diceRolled) return;
+    if (!gameState.movablePieces.includes(tokenIdx)) return;
+    
+    const oldPos = gameState.tokenPos[myColor][tokenIdx];
+    moveToken(myColor, tokenIdx, gameState.diceValue);
+    const newPos = gameState.tokenPos[myColor][tokenIdx];
+    
+    logGame(`You moved token ${tokenIdx+1}: ${describePos(myColor, oldPos)} → ${describePos(myColor, newPos)}`);
+    broadcastGameState(`${myUsername} moved token ${tokenIdx+1}`);
+    
+    const won = checkWinner(myColor);
+    if (won) {
+        setWinner(myColor);
+        return;
+    }
+    
+    // Extra turn on 6
+    nextTurn(gameState.diceValue === 6);
+}
+
+function nextTurn(extraTurn) {
+    gameState.diceRolled = false;
+    gameState.movablePieces = [];
+    gameState.diceValue = null;
+    document.getElementById('dice-box').textContent = '🎲';
+    
+    if (!extraTurn) {
+        const idx = gameState.turnOrder.indexOf(gameState.currentTurn);
+        // Find next active player
+        let next = idx;
+        for (let i = 0; i < gameState.activePlayers.length; i++) {
+            next = (next + 1) % gameState.turnOrder.length;
+            if (gameState.activePlayers.includes(gameState.turnOrder[next])) break;
+        }
+        gameState.currentTurn = gameState.turnOrder[next];
+    }
+    
+    updateTurnIndicator();
+    updateDiceAvailability();
+    renderTokens();
+    
+    const cur = gameState.currentTurn;
+    updateStatus(`${gameState.players[cur].name}'s turn (${cur})`);
+    
+    // If AI's turn, trigger AI move
+    if (cur !== myColor && gameState.activePlayers.includes(cur)) {
+        clearTimeout(aiMoveTimeout);
+        aiMoveTimeout = setTimeout(() => aiTakeTurn(cur), 1500);
+    }
+}
+
+function aiTakeTurn(color) {
+    if (gameState.currentTurn !== color || gameState.winner) return;
+    
+    const val = Math.floor(Math.random() * 6) + 1;
+    gameState.diceValue = val;
+    gameState.diceRolled = true;
+    
+    document.getElementById('dice-box').textContent = DICE_FACES[val-1];
+    document.getElementById('dice-box').classList.add('rolling');
+    setTimeout(() => document.getElementById('dice-box').classList.remove('rolling'), 400);
+    
+    logGame(`🎲 ${gameState.players[color].name} rolled a ${val}`);
+    
+    const movable = getMovable(color, val);
+    gameState.movablePieces = movable;
+    
+    setTimeout(() => {
+        if (movable.length === 0) {
+            logGame(`${gameState.players[color].name}: No moves. Turn passes.`);
+            broadcastGameState(`${gameState.players[color].name} rolled ${val}, no moves`);
+            nextTurn(false);
+        } else {
+            // AI strategy: prefer capture > entering home stretch > advancing furthest
+            let chosen = aiChooseToken(color, movable, val);
+            const oldPos = gameState.tokenPos[color][chosen];
+            moveToken(color, chosen, val);
+            const newPos = gameState.tokenPos[color][chosen];
+            
+            logGame(`${gameState.players[color].name} moved token ${chosen+1}: ${describePos(color, oldPos)} → ${describePos(color, newPos)}`);
+            broadcastGameState(`${gameState.players[color].name} rolled ${val} and moved token ${chosen+1}`);
+            
+            const won = checkWinner(color);
+            if (won) { setWinner(color); return; }
+            
+            nextTurn(val === 6);
+        }
+    }, 1200);
+}
+
+function aiChooseToken(color, movable, dice) {
+    // Prefer: enter board > capture > advance to home stretch > advance highest progress
+    let best = movable[0];
+    let bestScore = -Infinity;
+    
+    for (const ti of movable) {
+        const pos = gameState.tokenPos[color][ti];
+        let score = 0;
+        
+        if (pos === -1) score = 50; // enter board
+        else if (pos >= 100) score = 200 + pos; // home stretch, advance it
+        else {
+            const absIdx = getAbsoluteTrackIndex(color, pos + dice);
+            // Check if would capture
+            let wouldCapture = false;
+            for (const oc of gameState.activePlayers) {
+                if (oc === color) continue;
+                for (let t = 0; t < 4; t++) {
+                    const op = gameState.tokenPos[oc][t];
+                    if (op < 0 || op >= 100) continue;
+                    if (getAbsoluteTrackIndex(oc, op) === absIdx && !SAFE_INDICES.includes(absIdx)) {
+                        wouldCapture = true;
+                    }
+                }
+            }
+            if (wouldCapture) score = 150;
+            else score = pos + dice; // advance furthest
+        }
+        
+        if (score > bestScore) { bestScore = score; best = ti; }
+    }
+    return best;
+}
+
+function setWinner(color) {
+    gameState.winner = color;
+    const banner = document.getElementById('winner-banner');
+    banner.innerHTML = `
+        <div style="font-size:3em">${COLOR_EMOJI[color]}</div>
+        <div>${gameState.players[color].name} WINS! 🎉</div>
+        <button class="btn-game" onclick="resetGame()" style="font-size:0.7em;margin-top:10px">Play Again</button>
+    `;
+    banner.style.display = 'flex';
+    logGame(`🏆 ${gameState.players[color].name} wins the game!`);
+    broadcastGameState(`${gameState.players[color].name} WON the Ludo game! 🏆`);
+    updateDiceAvailability();
+}
+
+function updateTurnIndicator() {
+    const el = document.getElementById('turn-indicator');
+    el.innerHTML = '';
+    for (const color of gameState.activePlayers) {
+        const badge = document.createElement('div');
+        badge.className = 'player-badge' + (gameState.currentTurn === color ? ' active' : '');
+        badge.style.background = color === 'red' ? '#f38ba8' : color === 'green' ? '#a6e3a1' : color === 'blue' ? '#89b4fa' : '#f9e2af';
+        badge.title = gameState.players[color].name;
+        el.appendChild(badge);
+    }
+}
+
+function updateStatus(msg) {
+    document.getElementById('ludo-status').textContent = msg;
+}
+
+function logGame(msg) {
+    const log = document.getElementById('ludo-log');
+    log.innerHTML += msg + '<br>';
+    log.scrollTop = log.scrollHeight;
+}
+
+function describePos(color, pos) {
+    if (pos === -1) return 'base';
+    if (pos === 200) return 'goal 🏠';
+    if (pos >= 100) return `home stretch ${pos-100+1}`;
+    return `track ${pos}`;
+}
+
+function resetGame() {
+    clearTimeout(aiMoveTimeout);
+    document.getElementById('winner-banner').style.display = 'none';
+    
+    gameState.tokenPos = {
+        red:    [-1,-1,-1,-1],
+        green:  [-1,-1,-1,-1],
+        blue:   [-1,-1,-1,-1],
+        yellow: [-1,-1,-1,-1]
+    };
+    gameState.currentTurn = 'red';
+    gameState.diceValue = null;
+    gameState.diceRolled = false;
+    gameState.movablePieces = [];
+    gameState.winner = null;
+    gameState.gameStarted = true;
+    
+    document.getElementById('dice-box').textContent = '🎲';
+    document.getElementById('ludo-log').innerHTML = 'New game started! You are RED 🔴<br>';
+    
+    buildBoard();
+    renderTokens();
+    updateTurnIndicator();
+    updateStatus("Your turn! Roll the dice.");
+    updateDiceAvailability();
+    
+    if (ws && ws.readyState === WebSocket.OPEN) {
+        broadcastGameState('Game reset! New Ludo match started 🎲');
+    }
+}
+
+// ============================================================
+// MULTIPLAYER SYNC
+// ============================================================
+
+function broadcastGameState(eventDesc) {
+    if (!ws || ws.readyState !== WebSocket.OPEN) return;
+    
+    // Build a compact game state summary
+    const summary = buildGameSummary();
+    const gameMsg = `__LUDO__:${JSON.stringify({
+        event: eventDesc,
+        summary: summary,
+        tokenPos: gameState.tokenPos,
+        currentTurn: gameState.currentTurn,
+        winner: gameState.winner
+    })}`;
+    
+    ws.send(JSON.stringify({ sender: myUsername, message: gameMsg, image: null }));
+    
+    // Also show in chat as a game event
+    appendGameEventToChat(eventDesc, summary);
+}
+
+function appendGameEventToChat(event, summary) {
+    const chatBox = document.getElementById("chat-box");
+    const div = document.createElement("div");
+    div.className = "message-wrapper game-event-msg";
+    div.innerHTML = `🎮 <b>${event}</b><br><small style="opacity:0.7">${summary}</small>`;
+    chatBox.appendChild(div);
+    chatBox.scrollTop = chatBox.scrollHeight;
+}
+
+function buildGameSummary() {
+    const parts = [];
+    for (const color of gameState.activePlayers) {
+        const name = gameState.players[color].name;
+        const positions = gameState.tokenPos[color].map((p,i) => {
+            if (p === -1) return `T${i+1}:base`;
+            if (p === 200) return `T${i+1}:goal`;
+            if (p >= 100) return `T${i+1}:home${p-100+1}`;
+            return `T${i+1}:track${p}`;
+        });
+        parts.push(`${name}(${color}): ${positions.join(', ')}`);
+    }
+    return parts.join(' | ');
+}
+
+function handleRemoteGameState(data) {
+    // A remote game state update (from another player or AI)
+    try {
+        const gameData = JSON.parse(data.message.replace('__LUDO__:', ''));
+        
+        // If we're not the ones who sent it (sender != myUsername)
+        // and it contains full game state, we could sync
+        // For now: show the event in chat
+        appendGameEventToChat(gameData.event, gameData.summary);
+        
+        // If state was sent by another human player (not AI), sync our board
+        // AI bots just use the chat message to formulate their text responses
+        if (data.sender !== myUsername) {
+            // Optionally sync: only if their turn is valid
+            // For simplicity in this single-client setup, we track state locally
+            // In a true multi-device setup you'd sync here
+        }
+    } catch(e) {
+        console.log("Game state parse error", e);
+    }
+}
+
+// ============================================================
+// INIT
+// ============================================================
+
+function ludoAssignPlayer(username) {
+    // Always assign user as red
+    gameState.players.red.name = username;
+    gameState.players.red.isAI = false;
+    gameState.gameStarted = true;
+    
+    updateStatus("Your turn! Roll the dice 🎲");
+    updateDiceAvailability();
+}
+
+// Build board on page load
+buildBoard();
+renderTokens();
+updateStatus("Connect to a room to play!");
+document.getElementById('dice-box').classList.add('disabled');
+document.getElementById('ludo-log').innerHTML = 'Join a room to start the game!<br>';
+
+</script>
 </body>
-
 </html>

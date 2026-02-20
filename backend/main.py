@@ -65,6 +65,9 @@ room_histories = {}
 MAX_HISTORY = 10
 MAX_BOT_CONVERSATION_CHAIN = 3
 
+# --- LUDO GAME STATE PER ROOM ---
+room_ludo_state = {}
+
 def get_room_history(room_id):
     if room_id not in room_histories:
         room_histories[room_id] = []
@@ -78,12 +81,43 @@ def add_to_history(room_id, sender, message):
     if len(room_histories[room_id]) > MAX_HISTORY:
         room_histories[room_id].pop(0)
 
+def parse_ludo_message(message: str):
+    """Parse a __LUDO__: prefixed message and return game data dict or None."""
+    if not message.startswith("__LUDO__:"):
+        return None
+    try:
+        json_part = message[len("__LUDO__:"):]
+        return json.loads(json_part)
+    except Exception:
+        return None
+
+def update_ludo_state(room_id: str, game_data: dict):
+    """Update the stored Ludo state for a room."""
+    room_ludo_state[room_id] = game_data
+
+def get_ludo_context(room_id: str) -> str:
+    """Build a natural language summary of the current Ludo game state for AI context."""
+    if room_id not in room_ludo_state:
+        return ""
+    
+    state = room_ludo_state[room_id]
+    summary = state.get("summary", "")
+    current_turn = state.get("currentTurn", "")
+    winner = state.get("winner", None)
+    last_event = state.get("event", "")
+    
+    if winner:
+        return f"\n\n[LUDO GAME: {winner} just WON the game! Last event: {last_event}. Board: {summary}]"
+    
+    return f"\n\n[LUDO GAME in progress: Last event: {last_event}. Current turn: {current_turn}. Positions: {summary}]"
+
 # --- AI FUNCTIONS ---
 
-def build_messages_payload(bot_name: str, persona: str, current_room_history: list):
+def build_messages_payload(bot_name: str, persona: str, current_room_history: list, ludo_context: str = ""):
     system_instruction = (
         f"You are {bot_name}. {persona} "
         "Speak in 'Brolang' / Gen-Z slang. "
+        f"{ludo_context}"
         "CRITICAL: ONLY output your response. If you have nothing to say, output: SKIP."
     )
     
@@ -91,6 +125,9 @@ def build_messages_payload(bot_name: str, persona: str, current_room_history: li
     
     for msg in current_room_history:
         content = msg["message"]
+        # Skip raw ludo state blobs from chat history — use ludo_context instead
+        if content.startswith("__LUDO__:"):
+            continue
         if msg["sender"] == bot_name:
             messages.append({"role": "assistant", "content": content})
         else:
@@ -98,16 +135,21 @@ def build_messages_payload(bot_name: str, persona: str, current_room_history: li
             
     return messages
 
-async def fetch_groq(bot_name: str, room_history: list):
-    # --- FIX 1: Prevent Groq from replying to itself ---
+async def fetch_groq(bot_name: str, room_history: list, ludo_context: str = ""):
+    # Prevent Groq from replying to itself
     if room_history and room_history[-1]["sender"] == bot_name:
         return "SKIP"
 
     api_key = os.getenv("GROQ_API_KEY")
     if not api_key: return "SKIP"
     
-    persona = "You are the smart tech bro. You give good advice but keep it casual."
-    messages = build_messages_payload(bot_name, persona, room_history)
+    persona = (
+        "You are the smart tech bro who loves board games. "
+        "You give good advice but keep it casual. "
+        "When a Ludo game is happening, comment on the moves, roast bad plays, "
+        "and talk about your strategy like you're the smartest player at the table."
+    )
+    messages = build_messages_payload(bot_name, persona, room_history, ludo_context)
     
     try:
         async with httpx.AsyncClient() as client:
@@ -121,16 +163,20 @@ async def fetch_groq(bot_name: str, room_history: list):
             return response.json()["choices"][0]["message"]["content"].strip()
     except: return "SKIP"
 
-async def fetch_openrouter(bot_name: str, room_history: list):
-    # --- FIX 2: Prevent Router-AI from replying to itself (The Fix You Asked For) ---
+async def fetch_openrouter(bot_name: str, room_history: list, ludo_context: str = ""):
+    # Prevent Router-AI from replying to itself
     if room_history and room_history[-1]["sender"] == bot_name:
         return "SKIP"
 
     api_key = os.getenv("OPENROUTER_API_KEY")
     if not api_key: return "SKIP"
     
-    persona = "You are the wild, funny bro. You roast people."
-    messages = build_messages_payload(bot_name, persona, room_history)
+    persona = (
+        "You are the wild, funny bro who trash talks during Ludo. "
+        "You roast people's moves, celebrate when you win, cry when you get captured, "
+        "and never shut up about dice luck."
+    )
+    messages = build_messages_payload(bot_name, persona, room_history, ludo_context)
     
     headers = {
         "Authorization": f"Bearer {api_key}", 
@@ -190,7 +236,7 @@ async def describe_image(base64_image):
     return "[User uploaded image]"
 
 
-# --- AI TRIGGER (ROOM AWARE) ---
+# --- AI TRIGGER (ROOM AWARE, LUDO AWARE) ---
 async def trigger_ai_evaluations(room_id, chain_count=0):
     if chain_count >= MAX_BOT_CONVERSATION_CHAIN: return 
 
@@ -199,9 +245,12 @@ async def trigger_ai_evaluations(room_id, chain_count=0):
     # Get history SPECIFIC to this room
     current_history = get_room_history(room_id)
     
+    # Get current Ludo context for this room
+    ludo_context = get_ludo_context(room_id)
+    
     tasks = [
-        fetch_groq("Groq-AI", current_history), 
-        fetch_openrouter("Router-AI", current_history)
+        fetch_groq("Groq-AI", current_history, ludo_context), 
+        fetch_openrouter("Router-AI", current_history, ludo_context)
     ]
     results = await asyncio.gather(*tasks)
     
@@ -231,11 +280,24 @@ async def trigger_ai_evaluations(room_id, chain_count=0):
 async def websocket_endpoint(websocket: WebSocket, room_id: str, username: str):
     await manager.connect(websocket, room_id)
     
-    # Send existing history to new user
+    # Send existing history to new user (skip raw ludo blobs)
     existing_history = get_room_history(room_id)
     if existing_history:
         for msg in existing_history:
-            await websocket.send_text(json.dumps(msg))
+            # Don't replay raw ludo state messages to new joiners
+            if not msg.get("message", "").startswith("__LUDO__:"):
+                await websocket.send_text(json.dumps(msg))
+
+    # If there's an active ludo game, send current state summary to new joiner
+    if room_id in room_ludo_state:
+        ludo_state = room_ludo_state[room_id]
+        welcome_ludo = f"[Ludo game in progress: {ludo_state.get('summary', '')}]"
+        await websocket.send_text(json.dumps({
+            "sender": "System",
+            "message": welcome_ludo,
+            "image": None,
+            "room": room_id
+        }))
 
     await manager.broadcast_to_room(f"{username} joined Room {room_id}!", "System", room_id)
     
@@ -247,19 +309,38 @@ async def websocket_endpoint(websocket: WebSocket, room_id: str, username: str):
                 message_text = data.get("message", "")
                 image_data = data.get("image", None)
                 
-                if image_data:
+                # Check if this is a Ludo game state update
+                ludo_data = parse_ludo_message(message_text)
+                
+                if ludo_data:
+                    # Update stored game state for this room
+                    update_ludo_state(room_id, ludo_data)
+                    
+                    # Store a human-readable version in history for AI context
+                    readable = f"[Ludo: {ludo_data.get('event', 'game update')}] {ludo_data.get('summary', '')}"
+                    add_to_history(room_id, username, f"__LUDO__:{json.dumps(ludo_data)}")
+                    
+                    # Broadcast the full ludo message to all room members (so their boards stay in sync)
+                    await manager.broadcast_to_room(message_text, username, room_id)
+                    
+                    # Trigger AI to react to the Ludo move
+                    asyncio.create_task(trigger_ai_evaluations(room_id, chain_count=0))
+                
+                elif image_data:
                     desc = await describe_image(image_data)
                     add_to_history(room_id, username, desc)
                     await manager.broadcast_to_room(desc, username, room_id, image=image_data)
+                    asyncio.create_task(trigger_ai_evaluations(room_id, chain_count=0))
+                
                 else:
                     add_to_history(room_id, username, message_text)
                     await manager.broadcast_to_room(message_text, username, room_id)
+                    asyncio.create_task(trigger_ai_evaluations(room_id, chain_count=0))
             
             except json.JSONDecodeError:
                 add_to_history(room_id, username, data_str)
                 await manager.broadcast_to_room(data_str, username, room_id)
-            
-            asyncio.create_task(trigger_ai_evaluations(room_id, chain_count=0))
+                asyncio.create_task(trigger_ai_evaluations(room_id, chain_count=0))
                 
     except WebSocketDisconnect:
         manager.disconnect(websocket, room_id)
