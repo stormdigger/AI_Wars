@@ -2,6 +2,6 @@ fastapi
 uvicorn
 websockets
 httpx
-python-dotenvProcfile
+# python-dotenvProcfile
 jinja2
 python-multipart
