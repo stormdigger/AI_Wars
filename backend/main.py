@@ -31,20 +31,17 @@ class ConnectionManager:
             self.active_connections.remove(websocket)
 
     async def broadcast(self, message: str, sender: str, image: str = None):
-        # We now support sending an 'image' field in the JSON
+        # We support sending an 'image' field in the JSON
         payload = json.dumps({"sender": sender, "message": message, "image": image})
         
-        # --- FIX STARTS HERE ---
-        # We iterate over a COPY of the list ([:]) so we can safely remove dead connections
-        # without breaking the loop.
+        # --- FIX 1: ROBUST BROADCAST ---
+        # Iterate over a COPY of the list ([:]) to safely remove dead connections
         for connection in self.active_connections[:]:
             try:
                 await connection.send_text(payload)
             except Exception as e:
-                # If sending fails (user closed tab), remove them and keep going
                 print(f"Removing dead connection: {e}")
                 self.disconnect(connection)
-        # --- FIX ENDS HERE ---
 
 manager = ConnectionManager()
 
@@ -57,7 +54,6 @@ MAX_BOT_CONVERSATION_CHAIN = 3
 async def describe_image(base64_image):
     """
     Sends the image to Groq's free vision model to get a text description.
-    This allows the text-only bots to 'see' the image.
     """
     api_key = os.getenv("GROQ_API_KEY")
     if not api_key: return "[Image uploaded, but Vision AI is disabled (No Key)]"
@@ -65,12 +61,12 @@ async def describe_image(base64_image):
     headers = {"Authorization": f"Bearer {api_key}"}
     
     payload = {
-        "model": "meta-llama/llama-4-maverick-17b-128e-instruct", # Keeping your chosen model
+        "model": "llama-3.2-11b-vision-preview", # Free, fast vision model
         "messages": [
             {
                 "role": "user",
                 "content": [
-                    {"type": "text", "text": "Describe this image in 1 sentence. Focus on funny or interesting details."},
+                    {"type": "text", "text": "Describe this image in 1 sentence. Focus on funny details."},
                     {"type": "image_url", "image_url": {"url": base64_image}}
                 ]
             }
@@ -86,10 +82,9 @@ async def describe_image(base64_image):
                 description = response.json()["choices"][0]["message"]["content"]
                 return f"[User uploaded an image. Vision AI analysis: {description}]"
             else:
-                print(f"Vision Error: {response.text}")
-                return "[User uploaded an image, but Vision AI failed to read it.]"
+                return "[User uploaded an image, but Vision AI failed.]"
     except Exception as e:
-        print(f"Vision Request Failed: {e}")
+        print(f"Vision Error: {e}")
         return "[User uploaded an image]"
 
 # --- 2. THE TEXT BRAINS ---
@@ -98,15 +93,13 @@ def build_messages_payload(bot_name: str, persona: str):
     system_instruction = (
         f"You are {bot_name}. {persona} "
         "Speak in 'Brolang' / Gen-Z slang (fr, ngl, bet, cooked). "
-        "If you see a system message like '[User uploaded an image...]', react to the description as if you are seeing the photo! "
+        "If you see a description like '[User uploaded an image...]', react to it! "
         "CRITICAL: ONLY output your response. If you have nothing to say, output: SKIP."
     )
     
     messages = [{"role": "system", "content": system_instruction}]
     
     for msg in chat_history:
-        # We only feed the TEXT message to the bots (which includes the vision description)
-        # We do NOT send them the base64 image data to avoid crashing them.
         content = msg["message"] 
         if msg["sender"] == bot_name:
             messages.append({"role": "assistant", "content": content})
@@ -135,31 +128,56 @@ async def fetch_groq(bot_name: str):
     except: return "SKIP"
 
 async def fetch_openrouter(bot_name: str):
+    # --- FIX 2: FALLBACK MECHANISM ---
     api_key = os.getenv("OPENROUTER_API_KEY")
-    if not api_key: return "SKIP"
+    if not api_key: 
+        print("CRITICAL: OPENROUTER_API_KEY missing!")
+        return "SKIP"
     
     persona = "You are the wild, funny bro. You roast people."
     messages = build_messages_payload(bot_name, persona)
     
-    # Keeping your chosen Grok model
-    payload = {
-        "model": "x-ai/grok-4.1-fast",
-        "messages": messages,
-        "temperature": 1.0,
-        "provider": { "order": ["Free"] }
-    }
-    
+    # Attempt 1: Try Grok (Preferred)
     try:
         async with httpx.AsyncClient() as client:
+            print(f"Router-AI: Trying Grok...")
             response = await client.post(
                 "https://openrouter.ai/api/v1/chat/completions", 
-                headers={"Authorization": f"Bearer {api_key}", "HTTP-Referer": "http://localhost", "X-Title": "SquadChat"}, 
-                json=payload, 
+                headers={"Authorization": f"Bearer {api_key}", "HTTP-Referer": "https://render.com", "X-Title": "SquadChat"}, 
+                json={
+                    "model": "x-ai/grok-4.1-fast",
+                    "messages": messages,
+                    "temperature": 1.0
+                }, 
+                timeout=10.0
+            )
+            if response.status_code == 200:
+                return response.json()["choices"][0]["message"]["content"].strip()
+            else:
+                print(f"Grok failed ({response.status_code}). Switching to Fallback...")
+    except Exception as e:
+        print(f"Grok Connection Failed: {e}")
+
+    # Attempt 2: Fallback to Llama Free (Guaranteed)
+    try:
+        async with httpx.AsyncClient() as client:
+            print(f"Router-AI: Using Fallback Llama...")
+            response = await client.post(
+                "https://openrouter.ai/api/v1/chat/completions", 
+                headers={"Authorization": f"Bearer {api_key}", "HTTP-Referer": "https://render.com", "X-Title": "SquadChat"}, 
+                json={
+                    "model": "openai/gpt-oss-120b:free",
+                    "messages": messages,
+                    "temperature": 1.0
+                }, 
                 timeout=30.0
             )
-            if response.status_code != 200: return "SKIP"
-            return response.json()["choices"][0]["message"]["content"].strip()
-    except: return "SKIP"
+            if response.status_code == 200:
+                return response.json()["choices"][0]["message"]["content"].strip()
+    except Exception as e:
+        print(f"Fallback Failed: {e}")
+
+    return "SKIP"
 
 # --- AUTONOMOUS CHAT ENGINE ---
 async def trigger_ai_evaluations(chain_count=0):
@@ -193,39 +211,27 @@ async def websocket_endpoint(websocket: WebSocket, username: str):
     
     try:
         while True:
-            # Receive data (Could be text OR image JSON)
             data_str = await websocket.receive_text()
             
             try:
                 data = json.loads(data_str)
                 message_text = data.get("message", "")
-                image_data = data.get("image", None) # Base64 string
+                image_data = data.get("image", None)
                 
-                # --- CASE 1: IMAGE UPLOAD ---
                 if image_data:
-                    # 1. Analyze image with Vision AI
                     description = await describe_image(image_data)
-                    
-                    # 2. Save the DESCRIPTION to history (so bots can read it)
                     chat_history.append({"sender": username, "message": description})
-                    
-                    # 3. Broadcast the ACTUAL IMAGE to humans
-                    # We send the description as the 'message' so the UI can show the AI's analysis too
                     await manager.broadcast(description, username, image=image_data)
-                
-                # --- CASE 2: NORMAL TEXT ---
                 else:
                     chat_history.append({"sender": username, "message": message_text})
                     await manager.broadcast(message_text, username)
             
             except json.JSONDecodeError:
-                # Fallback for plain text (legacy)
                 chat_history.append({"sender": username, "message": data_str})
                 await manager.broadcast(data_str, username)
 
             if len(chat_history) > MAX_HISTORY: chat_history.pop(0)
             
-            # Trigger the bots (they will react to the description if it was an image)
             asyncio.create_task(trigger_ai_evaluations(chain_count=0))
                 
     except WebSocketDisconnect:
