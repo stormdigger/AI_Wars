@@ -4,331 +4,339 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Squad Chat + Rooms</title>
+    <title>Squad Chat + Ludo</title>
     <style>
         body {
             font-family: 'Segoe UI', sans-serif;
             background: #1e1e2e;
-            color: #cdd6f4;
+            color: #fff;
             display: flex;
+            gap: 20px;
             justify-content: center;
-            padding-top: 50px;
+            padding: 20px;
         }
 
+        /* CHAT STYLES */
         .chat-container {
-            width: 650px;
+            width: 350px;
             background: #313244;
             border-radius: 12px;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
-            overflow: hidden;
             display: flex;
             flex-direction: column;
+            height: 600px;
         }
 
-        .header {
-            background: #181825;
+        .chat-header {
             padding: 15px;
-            border-bottom: 2px solid #cba6f7;
+            background: #181825;
             text-align: center;
-            font-weight: bold;
-            font-size: 1.2em;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
+            border-bottom: 2px solid #cba6f7;
         }
 
         .chat-box {
-            height: 500px;
-            padding: 20px;
+            flex: 1;
             overflow-y: auto;
+            padding: 10px;
             display: flex;
             flex-direction: column;
-            gap: 10px;
-            scroll-behavior: smooth;
-        }
-
-        .message-wrapper {
-            display: flex;
-            flex-direction: column;
-            max-width: 85%;
-        }
-
-        .sender-name {
-            font-size: 0.8em;
-            margin-bottom: 3px;
-            color: #a6adc8;
+            gap: 8px;
         }
 
         .message {
-            padding: 12px;
+            padding: 8px 12px;
+            background: #45475a;
             border-radius: 8px;
-            line-height: 1.4;
-            word-wrap: break-word;
-        }
-
-        .message img {
-            max-width: 100%;
-            border-radius: 8px;
-            margin-top: 5px;
-            border: 2px solid #444;
-        }
-
-        .vision-caption {
-            font-size: 0.8em;
-            opacity: 0.7;
-            margin-top: 5px;
-            font-style: italic;
-            color: #fab387;
-        }
-
-        .System {
-            align-self: center;
-            text-align: center;
-            font-style: italic;
-            color: #9399b2;
             font-size: 0.9em;
         }
 
-        .Me {
-            align-self: flex-end;
-        }
-
-        .Me .message {
-            background: #cba6f7;
-            color: #11111b;
-            border-bottom-right-radius: 0;
-        }
-
-        .Others {
-            align-self: flex-start;
-        }
-
-        .Others .message {
-            background: #45475a;
-            border-bottom-left-radius: 0;
-        }
-
-        .Groq-AI .message {
-            background: #a6e3a1;
-            color: #11111b;
-            font-weight: 500;
-        }
-
-        .Router-AI .message {
-            background: #89b4fa;
-            color: #11111b;
-            font-weight: 500;
-        }
-
         .input-area {
-            display: flex;
-            padding: 15px;
+            padding: 10px;
             background: #181825;
-            gap: 10px;
-        }
-
-        input[type="text"] {
-            flex: 1;
-            padding: 12px;
-            border: none;
-            border-radius: 6px;
-            background: #1e1e2e;
-            color: #fff;
-            outline: none;
-        }
-
-        .upload-btn {
-            background: #45475a;
-            color: white;
-            width: 45px;
-            border-radius: 6px;
-            cursor: pointer;
             display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1.2em;
-            transition: 0.2s;
+            gap: 5px;
         }
 
-        .upload-btn:hover {
-            background: #585b70;
-        }
-
-        button.send-btn {
-            padding: 12px 20px;
-            background: #cba6f7;
-            color: #11111b;
+        input {
+            flex: 1;
+            padding: 8px;
+            border-radius: 4px;
             border: none;
-            border-radius: 6px;
+            background: #1e1e2e;
+            color: white;
+        }
+
+        /* LUDO STYLES */
+        .game-container {
+            width: 600px;
+            background: #313244;
+            border-radius: 12px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .ludo-board {
+            width: 400px;
+            height: 400px;
+            background: white;
+            display: grid;
+            grid-template-columns: repeat(15, 1fr);
+            grid-template-rows: repeat(15, 1fr);
+            border: 2px solid #000;
+            position: relative;
+        }
+
+        .cell {
+            border: 1px solid #ddd;
+            width: 100%;
+            height: 100%;
+        }
+
+        .red-base {
+            background: #ffadad;
+            grid-column: 1/7;
+            grid-row: 1/7;
+        }
+
+        .green-base {
+            background: #9bf6ff;
+            grid-column: 10/16;
+            grid-row: 1/7;
+        }
+
+        .blue-base {
+            background: #a0c4ff;
+            grid-column: 10/16;
+            grid-row: 10/16;
+        }
+
+        .yellow-base {
+            background: #fdffb6;
+            grid-column: 1/7;
+            grid-row: 10/16;
+        }
+
+        /* Tokens */
+        .token {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            border: 2px solid black;
+            position: absolute;
+            cursor: pointer;
+            transition: 0.2s;
+            z-index: 10;
+        }
+
+        .token:hover {
+            transform: scale(1.2);
+        }
+
+        .token.red {
+            background: red;
+        }
+
+        .token.green {
+            background: #00ff00;
+        }
+
+        .token.yellow {
+            background: yellow;
+        }
+
+        .token.blue {
+            background: blue;
+        }
+
+        .controls {
+            margin-top: 20px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border-radius: 5px;
+            border: none;
             cursor: pointer;
             font-weight: bold;
         }
 
-        button.send-btn:hover {
-            background: #b4befe;
+        .red-btn {
+            background: #ffadad;
+            color: black;
+        }
+
+        .green-btn {
+            background: #9bf6ff;
+            color: black;
+        }
+
+        .yellow-btn {
+            background: #fdffb6;
+            color: black;
+        }
+
+        .blue-btn {
+            background: #a0c4ff;
+            color: black;
+        }
+
+        #dice-display {
+            font-size: 2em;
+            margin: 10px;
+            font-weight: bold;
         }
 
         #setup-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #1e1e2e;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            height: 500px;
-            gap: 15px;
-        }
-
-        .setup-input {
-            width: 250px;
-            text-align: center;
-            padding: 12px;
-            border-radius: 6px;
-            border: none;
-            font-size: 1em;
+            z-index: 100;
         }
     </style>
 </head>
 
 <body>
 
+    <div id="setup-screen">
+        <h2>Enter Squad</h2>
+        <input id="u-name" placeholder="Name" style="margin: 10px; width: 200px; padding: 10px;">
+        <input id="r-id" placeholder="Room ID" style="margin: 10px; width: 200px; padding: 10px;">
+        <button class="btn" onclick="joinApp()" style="background: #cba6f7;">Start</button>
+    </div>
+
+    <div class="game-container">
+        <h2>🎲 Ludo Arena</h2>
+        <div id="dice-display">Dice: 🎲</div>
+        <div id="turn-display">Waiting for players...</div>
+
+        <div class="ludo-board" id="board">
+            <div class="red-base"></div>
+            <div class="green-base"></div>
+            <div class="yellow-base"></div>
+            <div class="blue-base"></div>
+            <div style="grid-column: 7/10; grid-row: 7/10; background: #eee;"></div>
+
+        </div>
+
+        <div class="controls">
+            <button class="btn red-btn" onclick="sit('red')">Sit Red</button>
+            <button class="btn green-btn" onclick="sit('green')">Sit Green</button>
+            <button class="btn yellow-btn" onclick="sit('yellow')">Sit Yellow</button>
+            <button class="btn blue-btn" onclick="sit('blue')">Sit Blue</button>
+            <button class="btn" style="background: white;" onclick="rollDice()">🎲 ROLL</button>
+        </div>
+    </div>
+
     <div class="chat-container">
-        <div class="header">
-            <span>🤖 Squad Chat</span>
-            <span id="room-display" style="font-size: 0.8em; opacity: 0.7; color: #cba6f7;"></span>
-        </div>
-
-        <div id="setup-screen">
-            <h2>Join a Squad</h2>
-            <input type="text" id="username-input" class="setup-input" placeholder="Your Username">
-            <input type="text" id="room-input" class="setup-input" placeholder="Room ID (e.g. 101)">
-            <button class="send-btn" onclick="joinChat()" style="width: 250px;">Enter Room</button>
-        </div>
-
-        <div id="chat-interface" style="display: none; flex-direction: column; height: 100%;">
-            <div class="chat-box" id="chat-box"></div>
-            <div class="input-area">
-                <input type="file" id="file-input" accept="image/*" style="display: none;"
-                    onchange="handleFileUpload(this)">
-
-                <div class="upload-btn" onclick="document.getElementById('file-input').click()" title="Upload Image">📷
-                </div>
-
-                <input type="text" id="message-input" placeholder="Type..." onkeypress="handleKeyPress(event)">
-                <button class="send-btn" onclick="sendMessage()">Send</button>
-            </div>
+        <div class="chat-header">Chat</div>
+        <div class="chat-box" id="chat-box"></div>
+        <div class="input-area">
+            <input id="msg-in" placeholder="Type..." onkeypress="if(event.key==='Enter') sendChat()">
+            <button class="btn" onclick="sendChat()" style="background:#cba6f7;">Send</button>
         </div>
     </div>
 
     <script>
-        let ws;
-        let myUsername = "";
-        let myRoom = "";
+        let ws, user, room;
+        // Map simplified path index (0-51) to Grid Coords (Approximate for visual simplicity)
+        // In a real app, you'd map every single cell. Here we map corners to show movement.
+        const pathMap = {
+            0: { top: '40%', left: '6.6%' }, 13: { top: '6.6%', left: '53%' },
+            26: { top: '53%', left: '93%' }, 39: { top: '93%', left: '40%' }
+        };
+        // Base positions
+        const basePos = {
+            'red': { top: '10%', left: '10%' }, 'green': { top: '10%', left: '80%' },
+            'yellow': { top: '80%', left: '10%' }, 'blue': { top: '80%', left: '80%' }
+        };
 
-        function joinChat() {
-            myUsername = document.getElementById("username-input").value.trim();
-            myRoom = document.getElementById("room-input").value.trim();
+        function joinApp() {
+            user = document.getElementById('u-name').value;
+            room = document.getElementById('r-id').value;
+            if (!user || !room) return alert("Fill all!");
+            document.getElementById('setup-screen').style.display = 'none';
 
-            if (!myUsername || !myRoom) return alert("Enter both Name and Room ID!");
-
-            document.getElementById("setup-screen").style.display = "none";
-            document.getElementById("chat-interface").style.display = "flex";
-            document.getElementById("room-display").innerText = "Room: " + myRoom;
-
-            // Connect to ROOM-SPECIFIC WebSocket URL
-            // CHANGE THIS URL IF DEPLOYED (e.g., wss://your-app.onrender.com)
-            // If testing locally, keep ws://localhost:8000
-            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const host = "ai-wars.onrender.com"; // CHANGE TO YOUR RENDER URL
             // const host = "localhost:8000"; // UNCOMMENT FOR LOCAL
-            const host = "ai-wars.onrender.com"; // UNCOMMENT FOR PROD (Use your actual Render URL)
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            ws = new WebSocket(`${protocol}//${host}/ws/${room}/${user}`);
 
-            ws = new WebSocket(`${protocol}//${host}/ws/${encodeURIComponent(myRoom)}/${encodeURIComponent(myUsername)}`);
-
-            ws.onmessage = (event) => {
-                const data = JSON.parse(event.data);
-                appendMessage(data.sender, data.message, data.image);
+            ws.onmessage = (e) => {
+                const data = JSON.parse(e.data);
+                if (data.game_state) updateBoard(data.game_state);
+                if (data.message) addMsg(data.sender, data.message);
             };
-
-            ws.onclose = () => appendMessage("System", "Connection lost. Please refresh.");
         }
 
-        // --- FILE UPLOAD LOGIC ---
-        function handleFileUpload(input) {
-            const file = input.files[0];
-            if (!file) return;
+        function sit(color) {
+            ws.send(JSON.stringify({ type: "game", action: "join", color: color }));
+        }
 
-            if (file.size > 2 * 1024 * 1024) {
-                alert("File too big! Keep it under 2MB for the AI.");
-                return;
+        function rollDice() {
+            ws.send(JSON.stringify({ type: "game", action: "roll" }));
+        }
+
+        function movePiece(idx) {
+            ws.send(JSON.stringify({ type: "game", action: "move", piece_index: idx }));
+        }
+
+        function updateBoard(state) {
+            document.getElementById('dice-display').innerText = `Dice: ${state.dice}`;
+            document.getElementById('turn-display').innerText = `Turn: ${state.turn.toUpperCase()}`;
+
+            // Remove old tokens
+            document.querySelectorAll('.token').forEach(e => e.remove());
+
+            // Render new tokens
+            for (const [color, pieces] of Object.entries(state.pieces)) {
+                pieces.forEach((pos, idx) => {
+                    const el = document.createElement('div');
+                    el.className = `token ${color}`;
+                    el.onclick = () => movePiece(idx);
+
+                    if (pos === -1) {
+                        // Base position (stacked slightly)
+                        el.style.top = `calc(${basePos[color].top} + ${idx * 5}px)`;
+                        el.style.left = `calc(${basePos[color].left} + ${idx * 5}px)`;
+                    } else {
+                        // Very simple path mapping for demo purposes
+                        // In full version, map 0-51 to specific X/Y%
+                        // This moves them roughly around the corners
+                        if (pos < 13) { el.style.top = '40%'; el.style.left = `${(pos + 1) * 6}%`; }
+                        else if (pos < 26) { el.style.top = `${(pos - 13 + 1) * 6}%`; el.style.left = '53%'; }
+                        else if (pos < 39) { el.style.top = '53%'; el.style.left = `${100 - (pos - 26 + 1) * 6}%`; }
+                        else { el.style.top = `${100 - (pos - 39 + 1) * 6}%`; el.style.left = '40%'; }
+                    }
+                    document.getElementById('board').appendChild(el);
+                });
             }
-
-            const reader = new FileReader();
-            reader.onload = function (e) {
-                const base64Image = e.target.result;
-
-                // Send image via WebSocket
-                ws.send(JSON.stringify({
-                    sender: myUsername,
-                    message: "",
-                    image: base64Image
-                }));
-            };
-            reader.readAsDataURL(file);
-            input.value = "";
         }
 
-        function sendMessage() {
-            const input = document.getElementById("message-input");
-            const text = input.value.trim();
-            if (!text) return;
-
-            ws.send(JSON.stringify({ sender: myUsername, message: text, image: null }));
-            input.value = '';
+        function sendChat() {
+            const txt = document.getElementById('msg-in').value;
+            if (txt) ws.send(JSON.stringify({ type: "chat", message: txt }));
+            document.getElementById('msg-in').value = "";
         }
 
-        function appendMessage(sender, text, image) {
-            const chatBox = document.getElementById("chat-box");
-            const msgWrapper = document.createElement("div");
-
-            let typeClass = "Others";
-            if (sender === "System") typeClass = "System";
-            else if (sender === myUsername) typeClass = "Me";
-            else if (sender.includes("Groq")) typeClass = "Groq-AI";
-            else if (sender.includes("Router")) typeClass = "Router-AI";
-
-            msgWrapper.className = `message-wrapper ${typeClass}`;
-
-            if (typeClass !== "System" && typeClass !== "Me") {
-                const nameDiv = document.createElement("div");
-                nameDiv.className = "sender-name";
-                nameDiv.textContent = sender;
-                msgWrapper.appendChild(nameDiv);
-            }
-
-            const bubbleDiv = document.createElement("div");
-            bubbleDiv.className = "message";
-
-            // --- IMAGE RENDERING ---
-            if (image) {
-                const img = document.createElement("img");
-                img.src = image;
-                bubbleDiv.appendChild(img);
-
-                if (text && text.includes("Vision AI analysis")) {
-                    const analysisText = text.split("Vision AI analysis: ")[1]?.replace("]", "") || "Analyzing...";
-                    const caption = document.createElement("div");
-                    caption.className = "vision-caption";
-                    caption.innerText = "👀 AI sees: " + analysisText;
-                    bubbleDiv.appendChild(caption);
-                }
-            } else {
-                bubbleDiv.textContent = text;
-            }
-
-            msgWrapper.appendChild(bubbleDiv);
-            chatBox.appendChild(msgWrapper);
-            chatBox.scrollTop = chatBox.scrollHeight;
+        function addMsg(sender, msg) {
+            const div = document.createElement('div');
+            div.className = "message";
+            div.innerHTML = `<strong>${sender}:</strong> ${msg}`;
+            document.getElementById('chat-box').appendChild(div);
+            document.getElementById('chat-box').scrollTop = 9999;
         }
-
-        function handleKeyPress(e) { if (e.key === "Enter") sendMessage(); }
     </script>
 </body>
 
