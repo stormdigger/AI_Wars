@@ -31,7 +31,6 @@ async def startup_event():
 # --- ROOM MANAGER ---
 class ConnectionManager:
     def __init__(self):
-        # Maps room_id -> List of WebSocket connections
         self.active_rooms: dict[str, list[WebSocket]] = {}
 
     async def connect(self, websocket: WebSocket, room_id: str):
@@ -44,7 +43,6 @@ class ConnectionManager:
         if room_id in self.active_rooms:
             if websocket in self.active_rooms[room_id]:
                 self.active_rooms[room_id].remove(websocket)
-            # If room is empty, clean it up (optional, but good for memory)
             if not self.active_rooms[room_id]:
                 del self.active_rooms[room_id]
 
@@ -53,7 +51,6 @@ class ConnectionManager:
         
         payload = json.dumps({"sender": sender, "message": message, "image": image, "room": room_id})
         
-        # Iterate over copy to safely handle disconnects
         for connection in self.active_rooms[room_id][:]:
             try:
                 await connection.send_text(payload)
@@ -64,7 +61,6 @@ class ConnectionManager:
 manager = ConnectionManager()
 
 # --- MULTI-ROOM HISTORY STORAGE ---
-# Format: { "room_id": [ {sender: "User", message: "Hi"}, ... ] }
 room_histories = {} 
 MAX_HISTORY = 10
 MAX_BOT_CONVERSATION_CHAIN = 3
@@ -82,7 +78,7 @@ def add_to_history(room_id, sender, message):
     if len(room_histories[room_id]) > MAX_HISTORY:
         room_histories[room_id].pop(0)
 
-# --- AI FUNCTIONS (Now taking room_history as input) ---
+# --- AI FUNCTIONS ---
 
 def build_messages_payload(bot_name: str, persona: str, current_room_history: list):
     system_instruction = (
@@ -103,6 +99,10 @@ def build_messages_payload(bot_name: str, persona: str, current_room_history: li
     return messages
 
 async def fetch_groq(bot_name: str, room_history: list):
+    # --- FIX 1: Prevent Groq from replying to itself ---
+    if room_history and room_history[-1]["sender"] == bot_name:
+        return "SKIP"
+
     api_key = os.getenv("GROQ_API_KEY")
     if not api_key: return "SKIP"
     
@@ -122,6 +122,10 @@ async def fetch_groq(bot_name: str, room_history: list):
     except: return "SKIP"
 
 async def fetch_openrouter(bot_name: str, room_history: list):
+    # --- FIX 2: Prevent Router-AI from replying to itself (The Fix You Asked For) ---
+    if room_history and room_history[-1]["sender"] == bot_name:
+        return "SKIP"
+
     api_key = os.getenv("OPENROUTER_API_KEY")
     if not api_key: return "SKIP"
     
@@ -167,8 +171,6 @@ async def describe_image(base64_image):
     api_key = os.getenv("GROQ_API_KEY")
     if not api_key: return "[Image uploaded]"
     
-    # ... (Vision logic remains same, just brief for brevity) ...
-    # You can paste your existing describe_image function here fully
     headers = {"Authorization": f"Bearer {api_key}"}
     payload = {
         "model": "llama-3.2-11b-vision-preview",
@@ -220,21 +222,19 @@ async def trigger_ai_evaluations(room_id, chain_count=0):
             await manager.broadcast_to_room(reply, bot_name, room_id)
             await asyncio.sleep(1.5) 
 
+    # Recursive call to allow bots to reply to each other
     if anyone_spoke: 
         await trigger_ai_evaluations(room_id, chain_count + 1)
 
-# --- WEBSOCKET ROUTE (UPDATED) ---
+# --- WEBSOCKET ROUTE ---
 @app.websocket("/ws/{room_id}/{username}")
 async def websocket_endpoint(websocket: WebSocket, room_id: str, username: str):
-    # Connect to specific room
     await manager.connect(websocket, room_id)
     
-    # Send history of this room to the new user so they see context
+    # Send existing history to new user
     existing_history = get_room_history(room_id)
     if existing_history:
-        # Optional: Send previous messages to just this user (simple implementation)
         for msg in existing_history:
-            # We send strictly to this new socket to fill their UI
             await websocket.send_text(json.dumps(msg))
 
     await manager.broadcast_to_room(f"{username} joined Room {room_id}!", "System", room_id)
@@ -259,7 +259,6 @@ async def websocket_endpoint(websocket: WebSocket, room_id: str, username: str):
                 add_to_history(room_id, username, data_str)
                 await manager.broadcast_to_room(data_str, username, room_id)
             
-            # Trigger bots for THIS room
             asyncio.create_task(trigger_ai_evaluations(room_id, chain_count=0))
                 
     except WebSocketDisconnect:
