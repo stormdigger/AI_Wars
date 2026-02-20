@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Squad Chat + Vision</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            background: #1e1e2e;
+            color: #cdd6f4;
+            display: flex;
+            justify-content: center;
+            padding-top: 50px;
+        }
+
+        .chat-container {
+            width: 650px;
+            background: #313244;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header {
+            background: #181825;
+            padding: 15px;
+            border-bottom: 2px solid #cba6f7;
+            text-align: center;
+            font-weight: bold;
+            font-size: 1.2em;
+        }
+
+        .chat-box {
+            height: 500px;
+            padding: 20px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            scroll-behavior: smooth;
+        }
+
+        .message-wrapper {
+            display: flex;
+            flex-direction: column;
+            max-width: 85%;
+        }
+
+        .sender-name {
+            font-size: 0.8em;
+            margin-bottom: 3px;
+            color: #a6adc8;
+        }
+
+        .message {
+            padding: 12px;
+            border-radius: 8px;
+            line-height: 1.4;
+            word-wrap: break-word;
+        }
+
+        /* IMAGE STYLES */
+        .message img {
+            max-width: 100%;
+            border-radius: 8px;
+            margin-top: 5px;
+            border: 2px solid #444;
+        }
+
+        .vision-caption {
+            font-size: 0.8em;
+            opacity: 0.7;
+            margin-top: 5px;
+            font-style: italic;
+            color: #fab387;
+        }
+
+        .System {
+            align-self: center;
+            text-align: center;
+            font-style: italic;
+            color: #9399b2;
+            font-size: 0.9em;
+        }
+
+        .Me {
+            align-self: flex-end;
+        }
+
+        .Me .message {
+            background: #cba6f7;
+            color: #11111b;
+            border-bottom-right-radius: 0;
+        }
+
+        .Others {
+            align-self: flex-start;
+        }
+
+        .Others .message {
+            background: #45475a;
+            border-bottom-left-radius: 0;
+        }
+
+        .Groq-AI .message {
+            background: #a6e3a1;
+            color: #11111b;
+            font-weight: 500;
+        }
+
+        .Router-AI .message {
+            background: #89b4fa;
+            color: #11111b;
+            font-weight: 500;
+        }
+
+        .input-area {
+            display: flex;
+            padding: 15px;
+            background: #181825;
+            gap: 10px;
+        }
+
+        input[type="text"] {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            border-radius: 6px;
+            background: #1e1e2e;
+            color: #fff;
+            outline: none;
+        }
+
+        /* Upload Button Style */
+        .upload-btn {
+            background: #45475a;
+            color: white;
+            width: 45px;
+            border-radius: 6px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2em;
+            transition: 0.2s;
+        }
+
+        .upload-btn:hover {
+            background: #585b70;
+        }
+
+        button.send-btn {
+            padding: 12px 20px;
+            background: #cba6f7;
+            color: #11111b;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        button.send-btn:hover {
+            background: #b4befe;
+        }
+
+        #setup-screen {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 500px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="chat-container">
+        <div class="header">🤖 Squad Chat + Vision</div>
+
+        <div id="setup-screen">
+            <h2 style="margin-bottom: 20px;">Username</h2>
+            <input type="text" id="username-input" placeholder="e.g. Creator"
+                style="width: 200px; text-align: center; padding: 10px;">
+            <button class="send-btn" onclick="joinChat()" style="margin-top: 15px;">Enter</button>
+        </div>
+
+        <div id="chat-interface" style="display: none; flex-direction: column; height: 100%;">
+            <div class="chat-box" id="chat-box"></div>
+            <div class="input-area">
+                <input type="file" id="file-input" accept="image/*" style="display: none;"
+                    onchange="handleFileUpload(this)">
+
+                <div class="upload-btn" onclick="document.getElementById('file-input').click()" title="Upload Image">📷
+                </div>
+
+                <input type="text" id="message-input" placeholder="Type..." onkeypress="handleKeyPress(event)">
+                <button class="send-btn" onclick="sendMessage()">Send</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let ws;
+        let myUsername = "";
+
+        function joinChat() {
+            const input = document.getElementById("username-input").value.trim();
+            if (!input) return alert("Enter a name first!");
+
+            myUsername = input;
+            document.getElementById("setup-screen").style.display = "none";
+            document.getElementById("chat-interface").style.display = "flex";
+
+            ws = new WebSocket(`ws://localhost:8000/ws/${encodeURIComponent(myUsername)}`);
+
+            ws.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                appendMessage(data.sender, data.message, data.image);
+            };
+
+            ws.onclose = () => appendMessage("System", "Connection lost.");
+        }
+
+        // --- FILE UPLOAD LOGIC ---
+        function handleFileUpload(input) {
+            const file = input.files[0];
+            if (!file) return;
+
+            // Check size (optional limit to 2MB to be safe for free APIs)
+            if (file.size > 2 * 1024 * 1024) {
+                alert("File too big! Keep it under 2MB for the AI.");
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = function (e) {
+                const base64Image = e.target.result; // "data:image/png;base64,..."
+
+                // Send image via WebSocket
+                ws.send(JSON.stringify({
+                    sender: myUsername,
+                    message: "",
+                    image: base64Image
+                }));
+            };
+            reader.readAsDataURL(file);
+            input.value = ""; // Reset input
+        }
+
+        function sendMessage() {
+            const input = document.getElementById("message-input");
+            const text = input.value.trim();
+            if (!text) return;
+
+            // Send normal text message
+            ws.send(JSON.stringify({ sender: myUsername, message: text, image: null }));
+            input.value = '';
+        }
+
+        function appendMessage(sender, text, image) {
+            const chatBox = document.getElementById("chat-box");
+            const msgWrapper = document.createElement("div");
+
+            let typeClass = "Others";
+            if (sender === "System") typeClass = "System";
+            else if (sender === myUsername) typeClass = "Me";
+            else if (sender.includes("Groq")) typeClass = "Groq-AI";
+            else if (sender.includes("Router")) typeClass = "Router-AI";
+
+            msgWrapper.className = `message-wrapper ${typeClass}`;
+
+            if (typeClass !== "System" && typeClass !== "Me") {
+                const nameDiv = document.createElement("div");
+                nameDiv.className = "sender-name";
+                nameDiv.textContent = sender;
+                msgWrapper.appendChild(nameDiv);
+            }
+
+            const bubbleDiv = document.createElement("div");
+            bubbleDiv.className = "message";
+
+            // --- IMAGE RENDERING ---
+            if (image) {
+                const img = document.createElement("img");
+                img.src = image;
+                bubbleDiv.appendChild(img);
+
+                // Add the AI's "Vision Analysis" as a caption if available
+                if (text && text.includes("Vision AI analysis")) {
+                    const analysisText = text.split("Vision AI analysis: ")[1]?.replace("]", "") || "Analyzing...";
+                    const caption = document.createElement("div");
+                    caption.className = "vision-caption";
+                    caption.innerText = "👀 AI sees: " + analysisText;
+                    bubbleDiv.appendChild(caption);
+                }
+            } else {
+                bubbleDiv.textContent = text;
+            }
+
+            msgWrapper.appendChild(bubbleDiv);
+            chatBox.appendChild(msgWrapper);
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+
+        function handleKeyPress(e) { if (e.key === "Enter") sendMessage(); }
+    </script>
+</body>
+
+</html>
