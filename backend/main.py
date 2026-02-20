@@ -33,8 +33,18 @@ class ConnectionManager:
     async def broadcast(self, message: str, sender: str, image: str = None):
         # We now support sending an 'image' field in the JSON
         payload = json.dumps({"sender": sender, "message": message, "image": image})
-        for connection in self.active_connections:
-            await connection.send_text(payload)
+        
+        # --- FIX STARTS HERE ---
+        # We iterate over a COPY of the list ([:]) so we can safely remove dead connections
+        # without breaking the loop.
+        for connection in self.active_connections[:]:
+            try:
+                await connection.send_text(payload)
+            except Exception as e:
+                # If sending fails (user closed tab), remove them and keep going
+                print(f"Removing dead connection: {e}")
+                self.disconnect(connection)
+        # --- FIX ENDS HERE ---
 
 manager = ConnectionManager()
 
@@ -55,7 +65,7 @@ async def describe_image(base64_image):
     headers = {"Authorization": f"Bearer {api_key}"}
     
     payload = {
-        "model": "meta-llama/llama-4-maverick-17b-128e-instruct", # Free, fast vision model
+        "model": "meta-llama/llama-4-maverick-17b-128e-instruct", # Keeping your chosen model
         "messages": [
             {
                 "role": "user",
@@ -131,7 +141,7 @@ async def fetch_openrouter(bot_name: str):
     persona = "You are the wild, funny bro. You roast people."
     messages = build_messages_payload(bot_name, persona)
     
-    # Using the free model we configured earlier
+    # Keeping your chosen Grok model
     payload = {
         "model": "x-ai/grok-4.1-fast",
         "messages": messages,
