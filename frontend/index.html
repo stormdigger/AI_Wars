@@ -3,1826 +3,237 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Squad – Chat + Games</title>
-    <link
-        href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Inter:wght@400;500;600&display=swap"
-        rel="stylesheet">
-    <style>
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0
-        }
-
-        :root {
-            --bg: #0f0f1a;
-            --surface: #1a1a2e;
-            --surface2: #212136;
-            --surface3: #2a2a45;
-            --border: #333355;
-            --accent: #7c6af7;
-            --accent2: #e879a0;
-            --text: #e0e0f0;
-            --text2: #9090b8;
-            --red: #ff5577;
-            --green: #44dd88;
-            --blue: #4488ff;
-            --yellow: #ffcc44;
-            --red-s: #ff557733;
-            --green-s: #44dd8833;
-            --blue-s: #4488ff33;
-            --yellow-s: #ffcc4433;
-        }
-
-        body {
-            font-family: 'Inter', sans-serif;
-            background: var(--bg);
-            color: var(--text);
-            min-height: 100vh;
-            padding: 16px;
-        }
-
-        .app-shell {
-            max-width: 1640px;
-            margin: 0 auto;
-            display: grid;
-            grid-template-columns: 390px 1fr;
-            grid-template-rows: auto 1fr;
-            gap: 14px;
-            height: calc(100vh - 32px);
-        }
-
-        /* TOP BAR */
-        .top-bar {
-            grid-column: 1/-1;
-            background: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: 12px;
-            padding: 11px 20px;
-            display: flex;
-            align-items: center;
-            gap: 14px;
-        }
-
-        .top-bar h1 {
-            font-family: 'Rajdhani', sans-serif;
-            font-size: 1.5em;
-            letter-spacing: 1px;
-            color: var(--accent);
-        }
-
-        .room-badge {
-            background: var(--surface3);
-            border: 1px solid var(--border);
-            border-radius: 20px;
-            padding: 3px 14px;
-            font-size: .8em;
-            color: var(--text2);
-        }
-
-        .tab-bar {
-            margin-left: auto;
-            display: flex;
-            gap: 6px;
-        }
-
-        .tab-btn {
-            padding: 6px 16px;
-            border-radius: 8px;
-            border: 1px solid var(--border);
-            background: var(--surface3);
-            color: var(--text2);
-            cursor: pointer;
-            font-size: .85em;
-            font-weight: 500;
-            transition: .15s;
-        }
-
-        .tab-btn.active,
-        .tab-btn:hover {
-            border-color: var(--accent);
-            color: var(--accent);
-        }
-
-        .tab-btn.active {
-            background: var(--accent);
-            color: #fff;
-        }
-
-        /* CHAT */
-        .chat-panel {
-            background: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: 12px;
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
-            min-height: 0;
-        }
-
-        .setup-screen {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            gap: 14px;
-            padding: 30px;
-        }
-
-        .setup-screen h2 {
-            font-family: 'Rajdhani', sans-serif;
-            font-size: 1.7em;
-            color: var(--accent);
-        }
-
-        .setup-input {
-            width: 100%;
-            max-width: 260px;
-            padding: 11px 16px;
-            background: var(--surface3);
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            color: var(--text);
-            font-size: .95em;
-            outline: none;
-            text-align: center;
-        }
-
-        .setup-input:focus {
-            border-color: var(--accent);
-        }
-
-        .btn-primary {
-            padding: 11px 28px;
-            background: linear-gradient(135deg, var(--accent), var(--accent2));
-            color: #fff;
-            border: none;
-            border-radius: 8px;
-            font-weight: 600;
-            font-size: .95em;
-            cursor: pointer;
-            font-family: 'Rajdhani', sans-serif;
-            letter-spacing: .5px;
-            transition: .15s;
-        }
-
-        .btn-primary:hover {
-            opacity: .9;
-            transform: translateY(-1px);
-        }
-
-        .chat-msgs {
-            flex: 1;
-            overflow-y: auto;
-            padding: 14px;
-            display: flex;
-            flex-direction: column;
-            gap: 7px;
-            scroll-behavior: smooth;
-            min-height: 0;
-        }
-
-        .chat-msgs::-webkit-scrollbar {
-            width: 3px;
-        }
-
-        .chat-msgs::-webkit-scrollbar-thumb {
-            background: var(--border);
-            border-radius: 3px;
-        }
-
-        .mw {
-            display: flex;
-            flex-direction: column;
-            max-width: 90%;
-        }
-
-        .mn {
-            font-size: .7em;
-            color: var(--text2);
-            margin-bottom: 2px;
-            font-weight: 500;
-        }
-
-        .mb {
-            padding: 9px 13px;
-            border-radius: 10px;
-            line-height: 1.5;
-            font-size: .87em;
-            word-wrap: break-word;
-        }
-
-        .ms {
-            align-self: center;
-            color: var(--text2);
-            font-size: .75em;
-            font-style: italic;
-            padding: 2px 10px;
-            background: var(--surface3);
-            border-radius: 20px;
-        }
-
-        .mme {
-            align-self: flex-end;
-        }
-
-        .mme .mb {
-            background: linear-gradient(135deg, var(--accent), var(--accent2));
-            color: #fff;
-            border-bottom-right-radius: 2px;
-        }
-
-        .mot {
-            align-self: flex-start;
-        }
-
-        .mot .mb {
-            background: var(--surface3);
-            border-bottom-left-radius: 2px;
-        }
-
-        .mgq {
-            align-self: flex-start;
-        }
-
-        .mgq .mb {
-            background: linear-gradient(135deg, #1a3a2a, #1e3a1e);
-            border: 1px solid #44dd8844;
-            color: #99ffcc;
-            border-bottom-left-radius: 2px;
-        }
-
-        .mrt {
-            align-self: flex-start;
-        }
-
-        .mrt .mb {
-            background: linear-gradient(135deg, #1a1a3a, #1e2040);
-            border: 1px solid #4488ff44;
-            color: #aaccff;
-            border-bottom-left-radius: 2px;
-        }
-
-        .mgame {
-            align-self: center;
-            font-size: .75em;
-            color: #ffcc44bb;
-            background: var(--surface3);
-            border: 1px solid var(--border);
-            border-radius: 6px;
-            padding: 4px 10px;
-            max-width: 95%;
-        }
-
-        .chat-inp-area {
-            padding: 11px;
-            background: var(--surface2);
-            border-top: 1px solid var(--border);
-            display: flex;
-            gap: 7px;
-        }
-
-        .chat-inp-area input {
-            flex: 1;
-            padding: 9px 13px;
-            background: var(--surface3);
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            color: var(--text);
-            font-size: .87em;
-            outline: none;
-        }
-
-        .chat-inp-area input:focus {
-            border-color: var(--accent);
-        }
-
-        .bico {
-            width: 38px;
-            height: 38px;
-            background: var(--surface3);
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1em;
-            transition: .15s;
-        }
-
-        .bico:hover {
-            background: var(--border);
-        }
-
-        .bsend {
-            padding: 9px 16px;
-            background: var(--accent);
-            color: #fff;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            font-weight: 600;
-            font-size: .84em;
-            transition: .15s;
-        }
-
-        .bsend:hover {
-            background: #6a5ae0;
-        }
-
-        /* GAME AREA */
-        .game-area {
-            background: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: 12px;
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
-            min-height: 0;
-        }
-
-        .gpane {
-            display: none;
-            flex: 1;
-            flex-direction: column;
-            align-items: center;
-            gap: 12px;
-            overflow-y: auto;
-            min-height: 0;
-        }
-
-        .gpane.vis {
-            display: flex;
-        }
-
-        .gpane::-webkit-scrollbar {
-            width: 3px;
-        }
-
-        .gpane::-webkit-scrollbar-thumb {
-            background: var(--border);
-        }
-
-        .pane-hdr {
-            width: 100%;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 11px 16px;
-            background: var(--surface2);
-            border-bottom: 1px solid var(--border);
-            flex-shrink: 0;
-        }
-
-        .pane-hdr h2 {
-            font-family: 'Rajdhani', sans-serif;
-            font-size: 1.15em;
-            letter-spacing: .5px;
-        }
-
-        .pane-hdr .bnew {
-            padding: 5px 13px;
-            background: var(--surface3);
-            border: 1px solid var(--border);
-            border-radius: 6px;
-            color: var(--text);
-            cursor: pointer;
-            font-size: .8em;
-            font-weight: 500;
-            transition: .15s;
-        }
-
-        .pane-hdr .bnew:hover {
-            border-color: var(--accent);
-            color: var(--accent);
-        }
-
-        .gpane-inner {
-            padding: 14px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 12px;
-            width: 100%;
-        }
-
-        /* ══ LUDO ══ */
-        #ludo-board {
-            display: grid;
-            grid-template-columns: repeat(15, 38px);
-            grid-template-rows: repeat(15, 38px);
-            gap: 2px;
-            background: #070710;
-            border: 3px solid #2a2a4a;
-            border-radius: 10px;
-            padding: 3px;
-            position: relative;
-            box-shadow: 0 0 60px #7c6af718, inset 0 0 30px #00000050;
-        }
-
-        .lc {
-            width: 38px;
-            height: 38px;
-            background: #141428;
-            border-radius: 4px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            position: relative;
-            border: 1px solid #ffffff06;
-        }
-
-        /* Home yard */
-        .lhr {
-            background: radial-gradient(circle at 55% 35%, #ff8899 0%, #cc1133 100%) !important;
-            border-color: #ff557760;
-        }
-
-        .lhg {
-            background: radial-gradient(circle at 45% 65%, #88ffaa 0%, #117733 100%) !important;
-            border-color: #44dd8860;
-        }
-
-        .lhb {
-            background: radial-gradient(circle at 45% 35%, #99bbff 0%, #1133bb 100%) !important;
-            border-color: #4488ff60;
-        }
-
-        .lhy {
-            background: radial-gradient(circle at 55% 65%, #ffe077 0%, #bb7700 100%) !important;
-            border-color: #ffcc4460;
-        }
-
-        /* Path */
-        .lpath {
-            background: #1c1c34 !important;
-            border-color: #ffffff11;
-        }
-
-        /* Colored safe paths */
-        .lpr {
-            background: #2a1018 !important;
-            border-color: var(--red-s);
-        }
-
-        .lpg {
-            background: #102a16 !important;
-            border-color: var(--green-s);
-        }
-
-        .lpb {
-            background: #101828 !important;
-            border-color: var(--blue-s);
-        }
-
-        .lpy {
-            background: #2a1e08 !important;
-            border-color: var(--yellow-s);
-        }
-
-        /* Home stretch lanes */
-        .lsr {
-            background: linear-gradient(135deg, #3a0810, #5a1020) !important;
-            border-color: var(--red) !important;
-        }
-
-        .lsg {
-            background: linear-gradient(135deg, #083a10, #10501a) !important;
-            border-color: var(--green) !important;
-        }
-
-        .lsb {
-            background: linear-gradient(135deg, #08103a, #101850) !important;
-            border-color: var(--blue) !important;
-        }
-
-        .lsy {
-            background: linear-gradient(135deg, #2a2008, #44340c) !important;
-            border-color: var(--yellow) !important;
-        }
-
-        /* Safe star */
-        .lsafe::after {
-            content: '★';
-            font-size: 15px;
-            color: #ffcc44;
-            text-shadow: 0 0 8px #ffcc44aa;
-            position: absolute;
-        }
-
-        /* Center */
-        .lcenter {
-            background: conic-gradient(var(--red) 0deg 90deg, var(--green) 90deg 180deg, var(--blue) 180deg 270deg, var(--yellow) 270deg 360deg) !important;
-            border-radius: 50% !important;
-            border: 3px solid #ffffff25 !important;
-            box-shadow: 0 0 20px #ffffff18;
-        }
-
-        /* Inner home circles */
-        .lcircle::after {
-            content: '';
-            width: 26px;
-            height: 26px;
-            border-radius: 50%;
-            border: 3px solid rgba(255, 255, 255, .2);
-            position: absolute;
-        }
-
-        /* Token */
-        .tok {
-            position: absolute;
-            width: 24px;
-            height: 24px;
-            border-radius: 50%;
-            border: 2.5px solid rgba(255, 255, 255, .55);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 8px;
-            font-weight: 700;
-            color: #000;
-            z-index: 10;
-            transition: transform .18s, box-shadow .18s;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, .7), inset 0 1px 4px rgba(255, 255, 255, .35);
-            text-shadow: none;
-        }
-
-        .tok-r {
-            background: radial-gradient(circle at 32% 30%, #ffaabc, var(--red));
-        }
-
-        .tok-g {
-            background: radial-gradient(circle at 32% 30%, #aaffcc, var(--green));
-        }
-
-        .tok-b {
-            background: radial-gradient(circle at 32% 30%, #aabbff, var(--blue));
-        }
-
-        .tok-y {
-            background: radial-gradient(circle at 32% 30%, #ffe999, var(--yellow));
-            color: #2a1a00;
-        }
-
-        .tok.mov {
-            animation: tpulse .65s infinite alternate;
-            cursor: pointer;
-            border-color: #fff;
-            z-index: 20;
-        }
-
-        @keyframes tpulse {
-            from {
-                box-shadow: 0 0 0 0 rgba(255, 255, 255, .45), 0 2px 10px rgba(0, 0, 0, .7)
-            }
-
-            to {
-                box-shadow: 0 0 0 9px rgba(255, 255, 255, 0), 0 2px 10px rgba(0, 0, 0, .7)
-            }
-        }
-
-        /* Ludo controls */
-        .lctrl {
-            display: flex;
-            gap: 14px;
-            align-items: center;
-            background: var(--surface2);
-            border: 1px solid var(--border);
-            border-radius: 10px;
-            padding: 11px 18px;
-            width: 100%;
-            justify-content: space-between;
-        }
-
-        .dice-wrap {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-
-        .dice {
-            width: 58px;
-            height: 58px;
-            background: linear-gradient(145deg, #28284a, #18182e);
-            border: 2px solid var(--accent);
-            border-radius: 10px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 2.1em;
-            cursor: pointer;
-            transition: .15s;
-            box-shadow: 0 4px 14px rgba(124, 106, 247, .3);
-            user-select: none;
-        }
-
-        .dice:hover:not(.doff) {
-            background: var(--surface3);
-            transform: scale(1.06);
-        }
-
-        .dice:active:not(.doff) {
-            transform: scale(.9);
-        }
-
-        .dice.doff {
-            opacity: .3;
-            cursor: not-allowed;
-            border-color: var(--border);
-            box-shadow: none;
-        }
-
-        .dice.dspin {
-            animation: droll .4s ease;
-        }
-
-        @keyframes droll {
-            0% {
-                transform: rotate(0) scale(1)
-            }
-
-            30% {
-                transform: rotate(-22deg) scale(1.2)
-            }
-
-            60% {
-                transform: rotate(18deg) scale(.9)
-            }
-
-            100% {
-                transform: rotate(0) scale(1)
-            }
-        }
-
-        .tdots {
-            display: flex;
-            gap: 7px;
-            align-items: center;
-            margin-top: 5px;
-        }
-
-        .tdot {
-            width: 28px;
-            height: 28px;
-            border-radius: 50%;
-            border: 2px solid transparent;
-            transition: .2s;
-            cursor: default;
-        }
-
-        .tdot.act {
-            border-color: #fff;
-            box-shadow: 0 0 12px #ffffff88;
-            transform: scale(1.18);
-        }
-
-        .lstat {
-            font-size: .81em;
-            color: var(--text2);
-            text-align: right;
-            max-width: 160px;
-            line-height: 1.4;
-        }
-
-        .llog {
-            width: 100%;
-            height: 70px;
-            background: var(--surface3);
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            padding: 7px 11px;
-            font-size: .74em;
-            overflow-y: auto;
-            color: var(--text2);
-            line-height: 1.65;
-        }
-
-        .llog::-webkit-scrollbar {
-            width: 3px;
-        }
-
-        .llog::-webkit-scrollbar-thumb {
-            background: var(--border);
-        }
-
-        .winner-ov {
-            position: absolute;
-            inset: 0;
-            background: rgba(7, 7, 16, .92);
-            display: none;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            gap: 11px;
-            border-radius: 8px;
-            z-index: 100;
-            backdrop-filter: blur(5px);
-        }
-
-        .winner-ov.show {
-            display: flex;
-        }
-
-        .wemoji {
-            font-size: 4em;
-            animation: wob 1s ease infinite alternate;
-        }
-
-        @keyframes wob {
-            from {
-                transform: rotate(-10deg) scale(1)
-            }
-
-            to {
-                transform: rotate(10deg) scale(1.12)
-            }
-        }
-
-        .wtext {
-            font-family: 'Rajdhani', sans-serif;
-            font-size: 2.1em;
-            font-weight: 700;
-            letter-spacing: 1px;
-        }
-
-        /* ══ CHESS ══ */
-        .chess-wrap {
-            display: flex;
-            gap: 18px;
-            align-items: flex-start;
-            justify-content: center;
-            flex-wrap: wrap;
-            padding: 14px;
-        }
-
-        .chess-board-outer {
-            display: flex;
-            flex-direction: column;
-        }
-
-        .chess-ranks-row {
-            display: flex;
-        }
-
-        .chess-rank-labels {
-            display: flex;
-            flex-direction: column;
-            width: 18px;
-            flex-shrink: 0;
-        }
-
-        .chess-rank-labels span {
-            height: 58px;
-            display: flex;
-            align-items: center;
-            font-size: .7em;
-            color: var(--text2);
-        }
-
-        .chess-file-labels {
-            display: flex;
-            padding-left: 18px;
-        }
-
-        .chess-file-labels span {
-            width: 58px;
-            text-align: center;
-            font-size: .7em;
-            color: var(--text2);
-        }
-
-        #chess-board {
-            display: grid;
-            grid-template-columns: repeat(8, 58px);
-            grid-template-rows: repeat(8, 58px);
-            border: 3px solid var(--border);
-            border-radius: 8px;
-            overflow: hidden;
-            box-shadow: 0 0 40px rgba(124, 106, 247, .12);
-        }
-
-        .cc {
-            width: 58px;
-            height: 58px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 2.1em;
-            cursor: pointer;
-            position: relative;
-            transition: background .1s;
-            user-select: none;
-        }
-
-        .cc.lt {
-            background: #23233c;
-        }
-
-        .cc.dk {
-            background: #141428;
-        }
-
-        .cc.sel {
-            background: #7c6af755 !important;
-            outline: 3px inset #7c6af7;
-        }
-
-        .cc.lm::after {
-            content: '';
-            width: 20px;
-            height: 20px;
-            border-radius: 50%;
-            background: rgba(124, 106, 247, .55);
-            position: absolute;
-        }
-
-        .cc.lc2 {
-            background: rgba(255, 85, 119, .22) !important;
-        }
-
-        .cc.chk {
-            background: rgba(255, 40, 40, .4) !important;
-            animation: chka .6s ease infinite alternate;
-        }
-
-        @keyframes chka {
-            from {
-                background: rgba(255, 40, 40, .28)
-            }
-
-            to {
-                background: rgba(255, 40, 40, .55)
-            }
-        }
-
-        .cc:hover:not(.lm) {
-            filter: brightness(1.25);
-        }
-
-        .chess-side {
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-            min-width: 195px;
-            max-width: 230px;
-        }
-
-        .cbox {
-            background: var(--surface2);
-            border: 1px solid var(--border);
-            border-radius: 10px;
-            padding: 12px;
-        }
-
-        .cbox h3 {
-            font-family: 'Rajdhani', sans-serif;
-            font-size: .9em;
-            color: var(--text2);
-            margin-bottom: 7px;
-            letter-spacing: .5px;
-        }
-
-        .pslot {
-            display: flex;
-            align-items: center;
-            gap: 9px;
-            padding: 7px;
-            border-radius: 7px;
-            margin-bottom: 5px;
-            background: var(--surface3);
-            border: 1px solid transparent;
-            transition: .2s;
-        }
-
-        .pslot.aturn {
-            border-color: var(--accent);
-            background: #1d1d38;
-        }
-
-        .pdot {
-            width: 13px;
-            height: 13px;
-            border-radius: 50%;
-            flex-shrink: 0;
-        }
-
-        .pname {
-            font-size: .83em;
-            font-weight: 500;
-            flex: 1;
-        }
-
-        .pstat {
-            font-size: .7em;
-            color: var(--text2);
-        }
-
-        .clog {
-            height: 160px;
-            overflow-y: auto;
-            font-size: .73em;
-            color: var(--text2);
-            line-height: 1.75;
-        }
-
-        .clog::-webkit-scrollbar {
-            width: 3px;
-        }
-
-        .clog::-webkit-scrollbar-thumb {
-            background: var(--border);
-        }
-
-        .cmove-row {
-            display: flex;
-            gap: 6px;
-        }
-
-        .cmnum {
-            color: var(--text2);
-            min-width: 22px;
-        }
-
-        .cmw {
-            color: #ddd;
-            min-width: 52px;
-        }
-
-        .cmb {
-            color: var(--text2);
-        }
-
-        .cstatus {
-            padding: 9px;
-            background: var(--surface3);
-            border-radius: 7px;
-            font-size: .8em;
-            color: var(--text);
-            text-align: center;
-            font-weight: 500;
-        }
-
-        .ccap {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 1px;
-            font-size: 1.1em;
-            min-height: 26px;
-            padding: 3px;
-            background: var(--surface3);
-            border-radius: 5px;
-        }
-
-        .bact {
-            width: 100%;
-            padding: 8px;
-            background: var(--surface3);
-            border: 1px solid var(--border);
-            border-radius: 7px;
-            color: var(--text);
-            cursor: pointer;
-            font-size: .8em;
-            font-weight: 500;
-            transition: .15s;
-        }
-
-        .bact:hover {
-            border-color: var(--accent);
-            color: var(--accent);
-        }
-
-        .promo-modal {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background: var(--surface);
-            border: 2px solid var(--accent);
-            border-radius: 12px;
-            padding: 18px;
-            z-index: 200;
-            display: none;
-            gap: 10px;
-            flex-direction: column;
-            align-items: center;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, .85);
-        }
-
-        .promo-modal.show {
-            display: flex;
-        }
-
-        .promo-title {
-            font-family: 'Rajdhani', sans-serif;
-            font-size: 1em;
-            color: var(--text2);
-        }
-
-        .promo-pieces {
-            display: flex;
-            gap: 9px;
-        }
-
-        .pp {
-            font-size: 2.4em;
-            cursor: pointer;
-            padding: 5px;
-            border-radius: 7px;
-            background: var(--surface3);
-            border: 2px solid var(--border);
-            transition: .15s;
-        }
-
-        .pp:hover {
-            border-color: var(--accent);
-            transform: scale(1.1);
-        }
-    </style>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#0b0b14">
+    <title>Squad.GG</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css">
 </head>
 
 <body>
-    <div class="app-shell">
 
-        <!-- TOP BAR -->
+    <!-- ══════════════════════════════════════════
+     SETUP SCREEN
+     ══════════════════════════════════════════ -->
+    <div id="setup-screen">
+        <h1>SQUAD.GG</h1>
+        <p>Chat + Games + AI</p>
+        <input class="setup-field" id="inp-user" placeholder="Your username" autocomplete="off" spellcheck="false">
+        <input class="setup-field" id="inp-room" placeholder="Room ID (e.g. 101)" autocomplete="off" spellcheck="false">
+        <button class="btn-join" onclick="joinRoom()">Enter Room →</button>
+    </div>
+
+    <!-- ══════════════════════════════════════════
+     APP SHELL (visible after join)
+     ══════════════════════════════════════════ -->
+    <div id="app">
+
+        <!-- ── Top bar ── -->
         <div class="top-bar">
-            <h1>⚡ SQUAD.GG</h1>
-            <div class="room-badge" id="room-badge">Not connected</div>
-            <div class="tab-bar">
-                <button class="tab-btn active" onclick="switchTab('ludo')">🎲 Ludo</button>
-                <button class="tab-btn" onclick="switchTab('chess')">♟ Chess</button>
+            <span class="logo">⚡ SQUAD</span>
+            <div class="room-pill" id="room-badge">Not connected</div>
+            <div class="spacer"></div>
+            <!-- Game tabs -->
+            <button class="tab-btn active" id="tab-ludo" data-tab="ludo" onclick="switchTab('ludo')">🎲 Ludo</button>
+            <button class="tab-btn" id="tab-chess" data-tab="chess" onclick="switchTab('chess')">♟ Chess</button>
+            <!-- Chat toggle (mobile only) -->
+            <div class="chat-toggle-btn" id="chat-toggle-btn" onclick="toggleChat()" title="Chat">
+                💬
+                <div class="chat-badge" id="chat-badge">0</div>
             </div>
         </div>
 
-        <!-- CHAT -->
-        <div class="chat-panel">
-            <div class="setup-screen" id="setup-screen">
-                <h2>Join Squad</h2>
-                <input class="setup-input" id="inp-user" placeholder="Your username">
-                <input class="setup-input" id="inp-room" placeholder="Room ID (e.g. 101)">
-                <button class="btn-primary" onclick="joinChat()">Enter Room →</button>
-            </div>
-            <div id="chat-live" style="display:none;flex-direction:column;flex:1;min-height:0;">
-                <div class="chat-msgs" id="chat-msgs"></div>
-                <div class="chat-inp-area">
+        <!-- ── Content area ── -->
+        <div class="content-area">
+
+            <!-- ── CHAT OVERLAY ── -->
+            <div class="chat-overlay collapsed" id="chat-overlay">
+                <button class="chat-close-btn" onclick="toggleChat()">✕ Close chat</button>
+                <div class="chat-messages-float" id="chat-messages"></div>
+                <div class="chat-input-bar">
                     <input type="file" id="file-inp" accept="image/*" style="display:none" onchange="handleFile(this)">
-                    <div class="bico" onclick="document.getElementById('file-inp').click()" title="Image">📷</div>
-                    <input type="text" id="chat-inp" placeholder="Type something…"
-                        onkeypress="if(event.key==='Enter')sendMsg()">
-                    <button class="bsend" onclick="sendMsg()">Send</button>
-                </div>
-            </div>
-        </div>
-
-        <!-- GAME AREA -->
-        <div class="game-area">
-
-            <!-- LUDO PANE -->
-            <div class="gpane vis" id="pane-ludo">
-                <div class="pane-hdr">
-                    <h2>🎲 Ludo — You vs AI Squad</h2>
-                    <button class="bnew" onclick="ludoReset()">New Game</button>
-                </div>
-                <div class="gpane-inner">
-                    <div class="lctrl">
-                        <div class="dice-wrap">
-                            <div class="dice doff" id="ldice" onclick="ludoRoll()">🎲</div>
-                            <div>
-                                <div style="font-size:.78em;color:var(--text2);margin-bottom:4px;">Players</div>
-                                <div class="tdots" id="tdots"></div>
-                            </div>
-                        </div>
-                        <div class="lstat" id="lstat">Join a room to play</div>
+                    <div class="btn-file-img" onclick="document.getElementById('file-inp').click()" title="Image">📷
                     </div>
-                    <div style="position:relative;">
-                        <div id="ludo-board"></div>
-                        <div class="winner-ov" id="ludo-winner">
-                            <div class="wemoji" id="wemoji">🏆</div>
-                            <div class="wtext" id="wtext">WINNER!</div>
-                            <button class="btn-primary" onclick="ludoReset()" style="margin-top:8px;">Play
-                                Again</button>
-                        </div>
-                    </div>
-                    <div class="llog" id="llog">Join a room to start playing…</div>
+                    <input type="text" id="chat-inp" placeholder="Type something…" onkeypress="sendMsgOnEnter(event)"
+                        autocomplete="off">
+                    <button class="chat-send-btn" onclick="sendMsg()">Send</button>
                 </div>
             </div>
 
-            <!-- CHESS PANE -->
-            <div class="gpane" id="pane-chess">
-                <div class="pane-hdr">
-                    <h2>♟ Chess — You (White) vs Groq-AI (Black)</h2>
-                    <button class="bnew" onclick="chessReset()">New Game</button>
-                </div>
-                <div class="chess-wrap">
-                    <div class="chess-board-outer">
-                        <div class="chess-file-labels" id="cfiles"></div>
-                        <div class="chess-ranks-row">
-                            <div class="chess-rank-labels" id="cranks"></div>
-                            <div style="position:relative;">
-                                <div id="chess-board"></div>
-                                <div class="promo-modal" id="promo-modal">
-                                    <div class="promo-title">Promote pawn to:</div>
-                                    <div class="promo-pieces" id="promo-pieces"></div>
+            <!-- ── GAME VIEW ── -->
+            <div class="game-view" id="game-view" style="display:none;">
+
+                <!-- LOBBY -->
+                <div class="lobby-view" id="lobby-view" style="display:flex;">
+                    <div class="lobby-card">
+                        <h2>🏠 ROOM LOBBY</h2>
+                        <!-- Player list -->
+                        <div id="lobby-player-list"></div>
+
+                        <!-- Game type selector -->
+                        <div>
+                            <div style="font-size:.78em;color:var(--text2);margin-bottom:6px;">Choose game:</div>
+                            <div class="game-type-selector">
+                                <div class="game-type-btn selected" data-type="ludo" onclick="selectGameType('ludo')">🎲
+                                    Ludo</div>
+                                <div class="game-type-btn" data-type="chess" onclick="selectGameType('chess')">♟ Chess
                                 </div>
                             </div>
                         </div>
-                    </div>
-                    <div class="chess-side">
-                        <div class="cbox">
-                            <h3>PLAYERS</h3>
-                            <div class="pslot aturn" id="cslot-w">
-                                <div class="pdot" style="background:#eee;border:1px solid #666;"></div>
-                                <div class="pname" id="cname-w">You (White)</div>
-                                <div class="pstat" id="cstatw">●</div>
-                            </div>
-                            <div class="pslot" id="cslot-b">
-                                <div class="pdot" style="background:#555;border:1px solid #999;"></div>
-                                <div class="pname">Groq-AI (Black)</div>
-                                <div class="pstat" id="cstatb">●</div>
-                            </div>
+
+                        <!-- Actions -->
+                        <div class="lobby-actions">
+                            <button class="btn-lobby" id="ready-btn" onclick="toggleReady()">✓ Ready</button>
+                            <button class="btn-lobby primary" id="start-game-btn" onclick="startGame()" disabled
+                                style="display:none;">
+                                ▶ Start Game
+                            </button>
                         </div>
-                        <div class="cbox">
-                            <h3>STATUS</h3>
-                            <div class="cstatus" id="cstatus">Join a room to play</div>
+
+                        <div style="font-size:.72em;color:var(--text2);text-align:center;line-height:1.6;">
+                            Mark yourself ready, then the host starts.<br>
+                            AI players fill empty slots automatically.
                         </div>
-                        <div class="cbox">
-                            <h3>CAPTURED</h3>
-                            <div style="font-size:.7em;color:var(--text2);margin-bottom:3px;">White took:</div>
-                            <div class="ccap" id="cap-w"></div>
-                            <div style="font-size:.7em;color:var(--text2);margin:5px 0 3px;">Black took:</div>
-                            <div class="ccap" id="cap-b"></div>
-                        </div>
-                        <div class="cbox">
-                            <h3>MOVES</h3>
-                            <div class="clog" id="clog"></div>
-                        </div>
-                        <button class="bact" onclick="chessUndo()">↩ Undo last move</button>
                     </div>
                 </div>
-            </div>
-        </div>
 
+                <!-- ──────────── LUDO PANE ──────────── -->
+                <div id="pane-ludo" style="width:100%;display:flex;flex-direction:column;align-items:center;gap:10px;">
+
+                    <!-- Controls bar -->
+                    <div class="game-controls">
+                        <div class="dice doff" id="ludo-dice" onclick="LudoGame.rollDice()">🎲</div>
+                        <div>
+                            <div style="font-size:.72em;color:var(--text2);margin-bottom:3px;">Players</div>
+                            <div class="turn-dots" id="turn-dots"></div>
+                        </div>
+                        <div class="game-status-txt" id="game-status">Waiting to start…</div>
+                        <button class="btn-game-sm" onclick="newGame('ludo')">↺ New</button>
+                    </div>
+
+                    <!-- Board wrapper (holds the board + winner overlay) -->
+                    <div style="position:relative;" id="ludo-board-wrap">
+                        <div id="ludo-board"></div>
+                        <!-- Winner overlay -->
+                        <div class="winner-ov" id="ludo-winner">
+                            <div class="w-emoji" id="ludo-winner-emoji">🏆</div>
+                            <div class="w-text" id="ludo-winner-text">WINNER!</div>
+                            <button class="btn-join" onclick="newGame('ludo')"
+                                style="margin-top:12px;width:auto;padding:10px 24px;">
+                                Play Again
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Game log -->
+                    <div class="game-log" id="game-log">Game events will appear here…</div>
+                </div>
+
+                <!-- ──────────── CHESS PANE ──────────── -->
+                <div id="pane-chess" class="hidden" style="width:100%;display:flex;justify-content:center;">
+                    <div class="chess-layout">
+
+                        <!-- Board + coords -->
+                        <div class="chess-board-wrap">
+                            <div class="chess-coord-files" id="c-files"></div>
+                            <div class="chess-rank-row">
+                                <div class="chess-coord-ranks" id="c-ranks"></div>
+                                <div style="position:relative;">
+                                    <div id="chess-board"></div>
+                                    <!-- Promotion modal -->
+                                    <div class="promo-modal" id="promo-modal">
+                                        <div class="promo-title">Promote pawn to:</div>
+                                        <div class="promo-pieces" id="promo-pieces"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Side panel -->
+                        <div class="chess-side">
+                            <div class="c-box">
+                                <h3>PLAYERS</h3>
+                                <div class="p-slot active" id="chess-slot-w">
+                                    <div class="p-dot" style="background:#ddd;border:1px solid #666;"></div>
+                                    <div class="p-name" id="cname-w">You (White)</div>
+                                </div>
+                                <div class="p-slot" id="chess-slot-b">
+                                    <div class="p-dot" style="background:#444;border:1px solid #888;"></div>
+                                    <div class="p-name">Groq-AI (Black)</div>
+                                </div>
+                            </div>
+                            <div class="c-box">
+                                <h3>STATUS</h3>
+                                <div class="c-status" id="c-status">Waiting to start…</div>
+                            </div>
+                            <div class="c-box">
+                                <h3>CAPTURED</h3>
+                                <div style="font-size:.7em;color:var(--text2);margin-bottom:3px;">White took:</div>
+                                <div class="c-cap" id="cap-w"></div>
+                                <div style="font-size:.7em;color:var(--text2);margin:5px 0 3px;">Black took:</div>
+                                <div class="c-cap" id="cap-b"></div>
+                            </div>
+                            <div class="c-box">
+                                <h3>MOVES</h3>
+                                <div class="c-log" id="c-log"></div>
+                            </div>
+                            <button class="btn-undo" onclick="ChessGame.undo()">↩ Undo move</button>
+                            <button class="btn-game-sm" onclick="newGame('chess')" style="width:100%;margin-top:4px;">↺
+                                New Game</button>
+                        </div>
+                    </div>
+                </div>
+
+            </div><!-- /game-view -->
+        </div><!-- /content-area -->
+    </div><!-- /app -->
+
+    <!-- ── Vote banner ── -->
+    <div id="vote-banner" class="vote-banner" style="display:none;">
+        <p class="vote-msg">Someone wants to join!</p>
+        <div class="vote-btns">
+            <button class="btn-accept" onclick="castVote(true)">✓ Accept</button>
+            <button class="btn-decline" onclick="castVote(false)">✕ Decline</button>
+        </div>
     </div>
 
+    <!-- ══════════════════════════════════════════
+     SCRIPTS (load order matters)
+     ══════════════════════════════════════════ -->
+    <script src="games/ludo.js"></script>
+    <script src="games/chess.js"></script>
+    <script src="js/app.js"></script>
+
     <script>
-        // ═══════════════════════════════
-        // CHAT
-        // ═══════════════════════════════
-        let ws, myUsername = '', myRoom = '';
-
-        function joinChat() {
-            myUsername = document.getElementById('inp-user').value.trim();
-            myRoom = document.getElementById('inp-room').value.trim();
-            if (!myUsername || !myRoom) { alert('Fill both fields!'); return; }
-            document.getElementById('setup-screen').style.display = 'none';
-            document.getElementById('chat-live').style.display = 'flex';
-            document.getElementById('room-badge').textContent = 'Room ' + myRoom;
-            document.getElementById('cname-w').textContent = myUsername + ' (White)';
-
-            const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-            ws = new WebSocket(`${proto}//ai-wars.onrender.com/ws/${encodeURIComponent(myRoom)}/${encodeURIComponent(myUsername)}`);
-            ws.onmessage = e => {
-                const d = JSON.parse(e.data);
-                if (d.message?.startsWith('__LUDO__:')) { handleLudoSync(d); return; }
-                if (d.message?.startsWith('__CHESS__:')) { handleChessSync(d); return; }
-                appendMsg(d.sender, d.message, d.image);
-            };
-            ws.onclose = () => appendMsg('System', 'Connection lost. Refresh.');
-            setTimeout(() => { ludoStart(); chessInit(); }, 500);
-        }
-
-        function handleFile(inp) {
-            const f = inp.files[0]; if (!f) return;
-            if (f.size > 2097152) { alert('Max 2MB!'); return; }
-            const r = new FileReader();
-            r.onload = e => ws.send(JSON.stringify({ sender: myUsername, message: '', image: e.target.result }));
-            r.readAsDataURL(f); inp.value = '';
-        }
-        function sendMsg() {
-            const inp = document.getElementById('chat-inp');
-            const t = inp.value.trim(); if (!t) return;
-            ws.send(JSON.stringify({ sender: myUsername, message: t, image: null })); inp.value = '';
-        }
-        function wsSend(obj) { if (ws && ws.readyState === 1) ws.send(JSON.stringify(obj)); }
-
-        function appendMsg(sender, text, image) {
-            const box = document.getElementById('chat-msgs');
-            const w = document.createElement('div');
-            let cls = 'mot';
-            if (sender === 'System') { w.className = 'ms'; w.textContent = text; box.appendChild(w); box.scrollTop = box.scrollHeight; return; }
-            if (sender === myUsername) cls = 'mme';
-            else if (sender.includes('Groq')) cls = 'mgq';
-            else if (sender.includes('Router')) cls = 'mrt';
-            w.className = 'mw ' + cls;
-            if (cls !== 'mme') { const n = document.createElement('div'); n.className = 'mn'; n.textContent = sender; w.appendChild(n); }
-            const b = document.createElement('div'); b.className = 'mb';
-            if (image) { const i = document.createElement('img'); i.src = image; i.style.cssText = 'max-width:100%;border-radius:6px;'; b.appendChild(i); if (text) { const t2 = document.createElement('div'); t2.style.cssText = 'font-size:.78em;opacity:.7;margin-top:4px;'; t2.textContent = text; b.appendChild(t2); } }
-            else b.textContent = text;
-            w.appendChild(b); box.appendChild(w); box.scrollTop = box.scrollHeight;
-        }
-        function appendGameMsg(txt) {
-            const box = document.getElementById('chat-msgs');
-            const d = document.createElement('div'); d.className = 'mgame'; d.textContent = '🎮 ' + txt;
-            box.appendChild(d); box.scrollTop = box.scrollHeight;
-        }
-        function switchTab(n) {
-            document.querySelectorAll('.tab-btn').forEach((b, i) => b.classList.toggle('active', ['ludo', 'chess'][i] === n));
-            document.getElementById('pane-ludo').classList.toggle('vis', n === 'ludo');
-            document.getElementById('pane-chess').classList.toggle('vis', n === 'chess');
-        }
-
-        // ═══════════════════════════════
-        // LUDO ENGINE
-        // ═══════════════════════════════
-        const LT = [ // 52-cell main track [row,col]
-            [6, 1], [6, 2], [6, 3], [6, 4], [6, 5],
-            [5, 6], [4, 6], [3, 6], [2, 6], [1, 6], [0, 6], [0, 7],
-            [0, 8], [1, 8], [2, 8], [3, 8], [4, 8], [5, 8],
-            [6, 9], [6, 10], [6, 11], [6, 12], [6, 13], [6, 14], [7, 14],
-            [8, 14], [8, 13], [8, 12], [8, 11], [8, 10], [8, 9],
-            [9, 8], [10, 8], [11, 8], [12, 8], [13, 8], [14, 8], [14, 7],
-            [14, 6], [13, 6], [12, 6], [11, 6], [10, 6], [9, 6],
-            [8, 5], [8, 4], [8, 3], [8, 2], [8, 1], [8, 0], [7, 0]
-        ];
-        const LSTART = { red: 0, green: 13, blue: 26 };
-        const LENTRY = { red: 51, green: 12, blue: 25 };
-        const LSTRETCH = {
-            red: [[7, 1], [7, 2], [7, 3], [7, 4], [7, 5], [7, 6]],
-            green: [[1, 7], [2, 7], [3, 7], [4, 7], [5, 7], [6, 7]],
-            blue: [[7, 13], [7, 12], [7, 11], [7, 10], [7, 9], [7, 8]]
-        };
-        const LYARD = {
-            red: [[1, 1], [2, 1], [1, 2], [2, 2]],
-            green: [[1, 12], [2, 12], [1, 13], [2, 13]],
-            blue: [[12, 12], [13, 12], [12, 13], [13, 13]]
-        };
-        const LSAFE = [0, 8, 13, 21, 26, 34, 39, 47];
-        const DF = ['⚀', '⚁', '⚂', '⚃', '⚄', '⚅'];
-        const LCOLORS = ['red', 'green', 'blue'];
-        const LCOL = { red: 'var(--red)', green: 'var(--green)', blue: 'var(--blue)' };
-        const LEMOJI = { red: '🔴', green: '🟢', blue: '🔵' };
-
-        let ludo = { pos: { red: [-1, -1, -1, -1], green: [-1, -1, -1, -1], blue: [-1, -1, -1, -1] }, turn: 'red', dice: null, rolled: false, movable: [], winner: null, started: false };
-        let lAiTimer = null;
-
-        function lAbsIdx(c, rel) { return (LSTART[c] + rel) % 52; }
-        function lCoord(c, pos) {
-            if (pos === -1) return null;
-            if (pos === 200) return [7, 7];
-            if (pos >= 100) return LSTRETCH[c][pos - 100];
-            return LT[lAbsIdx(c, pos)];
-        }
-        function lCanMove(c, ti, dice) {
-            const p = ludo.pos[c][ti];
-            if (p === 200) return false;
-            if (p === -1) return dice === 6;
-            if (p >= 100) return (p - 100 + dice) <= 5;
-            const abs = lAbsIdx(c, p), ea = LENTRY[c];
-            let te = ea >= abs ? ea - abs : 52 - abs + ea;
-            if (dice <= te) return true;
-            return (dice - te - 1) <= 5;
-        }
-        function lDoMove(c, ti, dice) {
-            let p = ludo.pos[c][ti];
-            if (p === -1) { ludo.pos[c][ti] = 0; lCheckCapture(c, ti); return; }
-            if (p >= 100) { const np = p + dice; ludo.pos[c][ti] = (np - 100 >= 5) ? 200 : np; return; }
-            const abs = lAbsIdx(c, p), ea = LENTRY[c];
-            let te = ea >= abs ? ea - abs : 52 - abs + ea;
-            if (dice <= te) { ludo.pos[c][ti] = p + dice; lCheckCapture(c, ti); }
-            else { const h = dice - te - 1; ludo.pos[c][ti] = h >= 5 ? 200 : (100 + h); }
-        }
-        function lCheckCapture(c, ti) {
-            const p = ludo.pos[c][ti]; if (p < 0 || p >= 100) return;
-            const abs = lAbsIdx(c, p); if (LSAFE.includes(abs)) return;
-            for (const oc of LCOLORS) {
-                if (oc === c) continue;
-                for (let t = 0; t < 4; t++) {
-                    const op = ludo.pos[oc][t];
-                    if (op >= 0 && op < 100 && lAbsIdx(oc, op) === abs) { ludo.pos[oc][t] = -1; lLog(`💥 ${LEMOJI[c]} captured ${LEMOJI[oc]}!`); }
+        // ── Build chess board coordinate labels on load ──
+        window.addEventListener("load", function () {
+            const cfiles = document.getElementById("c-files");
+            const cranks = document.getElementById("c-ranks");
+            if (cfiles) {
+                "abcdefgh".split("").forEach(f => {
+                    const s = document.createElement("span"); s.textContent = f; cfiles.appendChild(s);
+                });
+            }
+            if (cranks) {
+                for (let r = 0; r < 8; r++) {
+                    const s = document.createElement("span"); s.textContent = 8 - r; cranks.appendChild(s);
                 }
             }
-        }
-        function lMovable(c, dice) { return [0, 1, 2, 3].filter(i => lCanMove(c, i, dice)); }
-        function lWon(c) { return ludo.pos[c].every(p => p === 200); }
-        function lDescPos(c, p) { if (p === -1) return 'yard'; if (p === 200) return 'goal'; if (p >= 100) return `hs${p - 100 + 1}`; return `t${p}`; }
 
-        // Board build
-        function ludoBuildBoard() {
-            const bd = document.getElementById('ludo-board'); bd.innerHTML = '';
-            for (let r = 0; r < 15; r++)for (let c = 0; c < 15; c++) {
-                const el = document.createElement('div'); el.className = 'lc'; el.id = `lc${r}-${c}`; bd.appendChild(el);
-            }
-            lZone(0, 0, 5, 5, 'lhr'); lZone(0, 9, 5, 14, 'lhg'); lZone(9, 9, 14, 14, 'lhb'); lZone(9, 0, 14, 5, 'lhy');
-            [[1, 1], [1, 2], [2, 1], [2, 2], [1, 12], [1, 13], [2, 12], [2, 13], [12, 12], [12, 13], [13, 12], [13, 13], [12, 1], [12, 2], [13, 1], [13, 2]].forEach(([r, c]) => lc(r, c).classList.add('lcircle'));
-            LT.forEach(([r, c]) => lc(r, c).classList.add('lpath'));
-            // Red row
-            for (let i = 1; i <= 5; i++)lc(6, i).classList.add('lpr');
-            // Green col
-            for (let i = 1; i <= 5; i++)lc(i, 8).classList.add('lpg');
-            // Blue row
-            for (let i = 9; i <= 13; i++)lc(8, i).classList.add('lpb');
-            // Yellow col
-            for (let i = 9; i <= 13; i++)lc(i, 6).classList.add('lpy');
-            // Home stretches
-            LSTRETCH.red.forEach(([r, c]) => lc(r, c).classList.add('lsr'));
-            LSTRETCH.green.forEach(([r, c]) => lc(r, c).classList.add('lsg'));
-            LSTRETCH.blue.forEach(([r, c]) => lc(r, c).classList.add('lsb'));
-            // Safe stars
-            LSAFE.forEach(i => { const [r, c] = LT[i]; lc(r, c).classList.add('lsafe'); });
-            // Center
-            lc(7, 7).classList.add('lcenter');
-            // Starting cells
-            lc(6, 1).classList.add('lpr'); lc(0, 8).classList.add('lpg'); lc(8, 13).classList.add('lpb');
-        }
-        function lc(r, c) { return document.getElementById(`lc${r}-${c}`); }
-        function lZone(r1, c1, r2, c2, cls) { for (let r = r1; r <= r2; r++)for (let c = c1; c <= c2; c++)lc(r, c)?.classList.add(cls); }
-
-        function lRenderTokens() {
-            document.querySelectorAll('.tok').forEach(t => t.remove());
-            const occ = {};
-            for (const color of LCOLORS) {
-                for (let ti = 0; ti < 4; ti++) {
-                    const pos = ludo.pos[color][ti];
-                    const coord = pos === -1 ? LYARD[color][ti] : lCoord(color, pos);
-                    if (!coord) continue;
-                    const [r, c] = coord; const key = `${r}-${c}`;
-                    const idx = occ[key] || 0; occ[key] = idx + 1;
-                    const cell = lc(r, c); if (!cell) continue;
-                    const tok = document.createElement('div');
-                    const cl = { red: 'r', green: 'g', blue: 'b' }[color];
-                    tok.className = `tok tok-${cl}`;
-                    tok.textContent = ti + 1;
-                    const ox = [-8, 8, -8, 8][idx]; const oy = [-8, -8, 8, 8][idx];
-                    tok.style.left = `${7 + ox}px`; tok.style.top = `${7 + oy}px`;
-                    if (ludo.turn === color && ludo.rolled && ludo.movable.includes(ti)) tok.classList.add('mov');
-                    if (color === 'red' && ludo.turn === 'red' && ludo.rolled && ludo.movable.includes(ti)) {
-                        tok.style.cursor = 'pointer';
-                        tok.addEventListener('click', () => lPlayerMove(ti));
-                    }
-                    cell.appendChild(tok);
+            // Build ludo board (visual only, no game state yet)
+            if (window.LudoGame) {
+                // Build board structure without starting game
+                const bd = document.getElementById("ludo-board");
+                if (bd && bd.children.length === 0) {
+                    // Call internal board build by triggering a silent init
+                    // The board will be properly built when init() is called
                 }
             }
-        }
-
-        function lUpdateDots() {
-            const el = document.getElementById('tdots'); el.innerHTML = '';
-            for (const c of LCOLORS) {
-                const d = document.createElement('div');
-                d.className = 'tdot' + (ludo.turn === c ? ' act' : '');
-                d.style.background = LCOL[c]; d.title = { red: myUsername || 'You', green: 'Groq-AI', blue: 'Router-AI' }[c];
-                el.appendChild(d);
-            }
-        }
-        function lSetStat(msg) { document.getElementById('lstat').textContent = msg; }
-        function lLog(msg) { const el = document.getElementById('llog'); el.innerHTML += msg + '<br>'; el.scrollTop = el.scrollHeight; }
-        function lDiceEl() { return document.getElementById('ldice'); }
-        function lSetDice(on) { lDiceEl().classList.toggle('doff', !on); }
-
-        function ludoRoll() {
-            if (ludo.turn !== 'red' || ludo.rolled || ludo.winner || !ludo.started) return;
-            const val = Math.floor(Math.random() * 6) + 1;
-            ludo.dice = val; ludo.rolled = true;
-            const d = lDiceEl(); d.classList.add('dspin'); d.textContent = DF[val - 1];
-            setTimeout(() => d.classList.remove('dspin'), 400);
-            lLog(`🎲 ${myUsername} rolled ${val}`);
-            ludo.movable = lMovable('red', val);
-            if (!ludo.movable.length) { lLog('No moves — turn skipped'); setTimeout(() => lNextTurn(false), 1200); }
-            else if (ludo.movable.length === 1) { setTimeout(() => lPlayerMove(ludo.movable[0]), 550); }
-            else { lSetStat('Click a glowing token!'); lRenderTokens(); }
-            lSetDice(false);
-            lBroadcast(`${myUsername} rolled ${val}`);
-        }
-
-        function lPlayerMove(ti) {
-            if (ludo.turn !== 'red' || !ludo.rolled || !ludo.movable.includes(ti)) return;
-            const old = ludo.pos.red[ti];
-            lDoMove('red', ti, ludo.dice);
-            lLog(`🔴 Token ${ti + 1}: ${lDescPos('red', old)} → ${lDescPos('red', ludo.pos.red[ti])}`);
-            lBroadcast(`${myUsername} moved token ${ti + 1}`);
-            if (lWon('red')) { lSetWinner('red'); return; }
-            lNextTurn(ludo.dice === 6);
-        }
-
-        function lNextTurn(extra) {
-            ludo.rolled = false; ludo.movable = []; ludo.dice = null;
-            lDiceEl().textContent = '🎲';
-            if (!extra) {
-                const i = LCOLORS.indexOf(ludo.turn); ludo.turn = LCOLORS[(i + 1) % LCOLORS.length];
-            }
-            lUpdateDots(); lRenderTokens();
-            const nm = { red: myUsername || 'You', green: 'Groq-AI', blue: 'Router-AI' }[ludo.turn];
-            lSetStat(`${nm}'s turn`);
-            if (ludo.turn !== 'red') { lSetDice(false); clearTimeout(lAiTimer); lAiTimer = setTimeout(() => lAiTurn(ludo.turn), 1900); }
-            else { lSetDice(true); lSetStat('Your turn — roll the dice!'); }
-        }
-
-        function lAiTurn(color) {
-            if (ludo.turn !== color || ludo.winner) return;
-            const val = Math.floor(Math.random() * 6) + 1;
-            ludo.dice = val; ludo.rolled = true;
-            const d = lDiceEl(); d.textContent = DF[val - 1]; d.classList.add('dspin');
-            setTimeout(() => d.classList.remove('dspin'), 400);
-            const nm = { green: 'Groq-AI', blue: 'Router-AI' }[color];
-            lLog(`🎲 ${nm} rolled ${val}`);
-            const mv = lMovable(color, val); ludo.movable = mv;
-            setTimeout(() => {
-                if (!mv.length) { lLog(`${nm}: no moves`); lBroadcast(`${nm} rolled ${val}, no moves`); lNextTurn(false); }
-                else {
-                    const ti = lAiChoose(color, mv, val);
-                    const old = ludo.pos[color][ti];
-                    lDoMove(color, ti, val);
-                    lLog(`${LEMOJI[color]} ${nm} token ${ti + 1}: ${lDescPos(color, old)} → ${lDescPos(color, ludo.pos[color][ti])}`);
-                    lBroadcast(`${nm} rolled ${val}, moved token ${ti + 1}`);
-                    if (lWon(color)) { lSetWinner(color); return; }
-                    lNextTurn(val === 6);
-                }
-            }, 1350);
-        }
-
-        function lAiChoose(color, mv, dice) {
-            let best = mv[0], bestS = -Infinity;
-            for (const ti of mv) {
-                const p = ludo.pos[color][ti]; let s = 0;
-                if (p === -1) s = 65;
-                else if (p >= 100) s = 210 + p;
-                else {
-                    let cap = false;
-                    if (p + dice < 52) {
-                        const na = lAbsIdx(color, p + dice);
-                        if (!LSAFE.includes(na)) {
-                            for (const oc of LCOLORS) {
-                                if (oc === color) continue;
-                                for (let t = 0; t < 4; t++) { const op = ludo.pos[oc][t]; if (op >= 0 && op < 100 && lAbsIdx(oc, op) === na) cap = true; }
-                            }
-                        }
-                    }
-                    s = cap ? 185 : p + dice;
-                }
-                if (s > bestS) { bestS = s; best = ti; }
-            }
-            return best;
-        }
-
-        function lSetWinner(color) {
-            ludo.winner = color;
-            const nm = { red: myUsername || 'You', green: 'Groq-AI', blue: 'Router-AI' }[color];
-            document.getElementById('wemoji').textContent = LEMOJI[color];
-            document.getElementById('wtext').textContent = `${nm} WINS!`;
-            document.getElementById('ludo-winner').classList.add('show');
-            lLog(`🏆 ${nm} wins!`);
-            lBroadcast(`${nm} WON Ludo! 🏆`);
-            lSetDice(false);
-        }
-
-        function lBuildSummary() {
-            return LCOLORS.map(c => `${c}:[${ludo.pos[c].map((p, i) => lDescPos(c, p)).join(',')}]`).join(' ');
-        }
-        function lBroadcast(event) {
-            if (!ws || ws.readyState !== 1) return;
-            wsSend({ sender: myUsername, message: `__LUDO__:${JSON.stringify({ event, summary: lBuildSummary(), pos: ludo.pos, turn: ludo.turn, winner: ludo.winner })}`, image: null });
-            appendGameMsg(event);
-        }
-        function handleLudoSync(data) {
-            try { const d = JSON.parse(data.message.replace('__LUDO__:', '')); appendGameMsg(d.event || 'Ludo update'); } catch (e) { }
-        }
-        function ludoStart() {
-            ludo.started = true;
-            ludoBuildBoard(); lRenderTokens(); lUpdateDots(); lSetDice(true);
-            lSetStat('Your turn — roll the dice!');
-            document.getElementById('llog').textContent = 'Game started! You are 🔴 Red.';
-        }
-        function ludoReset() {
-            clearTimeout(lAiTimer);
-            ludo = { pos: { red: [-1, -1, -1, -1], green: [-1, -1, -1, -1], blue: [-1, -1, -1, -1] }, turn: 'red', dice: null, rolled: false, movable: [], winner: null, started: !!myUsername };
-            document.getElementById('ludo-winner').classList.remove('show');
-            lDiceEl().textContent = '🎲';
-            document.getElementById('llog').textContent = 'New game started!';
-            ludoBuildBoard(); lRenderTokens(); lUpdateDots();
-            if (ludo.started) { lSetDice(true); lSetStat('Your turn — roll the dice!'); lBroadcast('New Ludo match started!'); }
-            else { lSetDice(false); lSetStat('Join a room to play'); }
-        }
-        ludoBuildBoard(); lRenderTokens();
-
-        // ═══════════════════════════════
-        // CHESS ENGINE (full rules + minimax depth-2)
-        // ═══════════════════════════════
-        const UNIC = { wk: '♔', wq: '♕', wr: '♖', wb: '♗', wn: '♘', wp: '♙', bk: '♚', bq: '♛', br: '♜', bb: '♝', bn: '♞', bp: '♟' };
-        let chess = {}, cAiRunning = false;
-
-        function chessInitState() {
-            const b = Array.from({ length: 8 }, () => Array(8).fill(null));
-            const back = ['r', 'n', 'b', 'q', 'k', 'b', 'n', 'r'];
-            for (let f = 0; f < 8; f++) { b[0][f] = { type: back[f], color: 'b' }; b[1][f] = { type: 'p', color: 'b' }; b[6][f] = { type: 'p', color: 'w' }; b[7][f] = { type: back[f], color: 'w' }; }
-            return { board: b, turn: 'w', sel: null, legal: [], hist: [], castling: { wk: true, wq: true, bk: true, bq: true }, ep: null, capW: [], capB: [], inCheck: false, mate: false, stale: false, started: false, promo: null };
-        }
-
-        function chessInit() {
-            chess = chessInitState(); chess.started = true;
-            cRender(); cUpdateSide(); cSetStat('Your turn (White)');
-            document.getElementById('clog').innerHTML = '';
-            document.getElementById('cap-w').innerHTML = '';
-            document.getElementById('cap-b').innerHTML = '';
-        }
-
-        function cRender() {
-            const bd = document.getElementById('chess-board'); bd.innerHTML = '';
-            for (let r = 0; r < 8; r++)for (let f = 0; f < 8; f++) {
-                const cell = document.createElement('div');
-                cell.className = 'cc ' + ((r + f) % 2 === 0 ? 'lt' : 'dk');
-                cell.dataset.r = r; cell.dataset.f = f;
-                const p = chess.board[r][f];
-                if (p) cell.textContent = UNIC[p.color + p.type];
-                if (chess.sel && chess.sel[0] === r && chess.sel[1] === f) cell.classList.add('sel');
-                const isL = chess.legal.some(m => m[0] === r && m[1] === f);
-                if (isL) { if (p && p.color !== chess.turn) cell.classList.add('lc2'); else cell.classList.add('lm'); }
-                if (chess.inCheck && p && p.type === 'k' && p.color === chess.turn) cell.classList.add('chk');
-                cell.addEventListener('click', () => cClick(r, f));
-                bd.appendChild(cell);
-            }
-        }
-        function cUpdateSide() {
-            document.getElementById('cslot-w').classList.toggle('aturn', chess.turn === 'w' && !chess.mate && !chess.stale);
-            document.getElementById('cslot-b').classList.toggle('aturn', chess.turn === 'b' && !chess.mate && !chess.stale);
-            document.getElementById('cap-w').textContent = chess.capW.map(p => UNIC['b' + p]).join('');
-            document.getElementById('cap-b').textContent = chess.capB.map(p => UNIC['w' + p]).join('');
-        }
-        function cSetStat(msg) { document.getElementById('cstatus').textContent = msg; }
-        function cAddLog(san, color) {
-            const log = document.getElementById('clog');
-            const mn = Math.ceil(chess.hist.length / 2);
-            if (color === 'w') {
-                const row = document.createElement('div'); row.className = 'cmove-row';
-                row.innerHTML = `<span class="cmnum">${mn}.</span><span class="cmw">${san}</span><span class="cmb" id="clb${mn}"></span>`;
-                log.appendChild(row);
-            } else {
-                const sp = document.getElementById(`clb${mn}`);
-                if (sp) sp.textContent = san;
-                else { const row = document.createElement('div'); row.className = 'cmove-row'; row.innerHTML = `<span class="cmnum">${mn}.</span><span class="cmw">…</span><span class="cmb">${san}</span>`; log.appendChild(row); }
-            }
-            log.scrollTop = log.scrollHeight;
-        }
-
-        function cClick(r, f) {
-            if (!chess.started || chess.turn !== 'w' || chess.mate || chess.stale || cAiRunning || chess.promo) return;
-            const p = chess.board[r][f];
-            if (chess.sel) {
-                const [sr, sf] = chess.sel;
-                if (chess.legal.some(m => m[0] === r && m[1] === f)) { cExec(sr, sf, r, f, 'w'); return; }
-                chess.sel = null; chess.legal = [];
-                if (p && p.color === 'w') { chess.sel = [r, f]; chess.legal = cGetLegal(r, f, 'w'); }
-            } else {
-                if (p && p.color === 'w') { chess.sel = [r, f]; chess.legal = cGetLegal(r, f, 'w'); }
-            }
-            cRender();
-        }
-
-        function cExec(fr, ff, tr, tf, color, silent) {
-            const piece = chess.board[fr][ff];
-            const target = chess.board[tr][tf];
-            const san = cSAN(fr, ff, tr, tf, piece, target, color);
-            if (target) { color === 'w' ? chess.capW.push(target.type) : chess.capB.push(target.type); }
-            // En passant
-            if (piece.type === 'p' && chess.ep && tr === chess.ep[0] && tf === chess.ep[1]) {
-                const cr = color === 'w' ? tr + 1 : tr - 1; const cp = chess.board[cr][tf];
-                if (cp) { color === 'w' ? chess.capW.push(cp.type) : chess.capB.push(cp.type); }
-                chess.board[cr][tf] = null;
-            }
-            chess.board[tr][tf] = { ...piece }; chess.board[fr][ff] = null;
-            // Castling move rook
-            if (piece.type === 'k') {
-                if (tf - ff === 2) { chess.board[tr][tf - 1] = { type: 'r', color }; chess.board[tr][7] = null; }
-                if (ff - tf === 2) { chess.board[tr][tf + 1] = { type: 'r', color }; chess.board[tr][0] = null; }
-                chess.castling[color + 'k'] = false; chess.castling[color + 'q'] = false;
-            }
-            if (piece.type === 'r') { if (ff === 0) chess.castling[color + 'q'] = false; if (ff === 7) chess.castling[color + 'k'] = false; }
-            chess.ep = null;
-            if (piece.type === 'p' && Math.abs(tr - fr) === 2) chess.ep = [(fr + tr) / 2, ff];
-            // Promotion
-            if (piece.type === 'p' && (tr === 0 || tr === 7)) {
-                if (silent) { chess.board[tr][tf] = { type: 'q', color }; }
-                else {
-                    chess.promo = { fr, ff, tr, tf, color, san };
-                    const pm = document.getElementById('promo-modal');
-                    const pp = document.getElementById('promo-pieces');
-                    pp.innerHTML = '';
-                    ['q', 'r', 'b', 'n'].forEach(t => {
-                        const d = document.createElement('div'); d.className = 'pp';
-                        d.textContent = UNIC[color + t]; d.addEventListener('click', () => chessPromote(t)); pp.appendChild(d);
-                    });
-                    pm.classList.add('show'); cRender(); return;
-                }
-            }
-            cFinish(fr, ff, tr, tf, color, san, silent);
-        }
-
-        function chessPromote(type) {
-            if (!chess.promo) return;
-            const { fr, ff, tr, tf, color, san } = chess.promo;
-            chess.board[tr][tf] = { type, color };
-            chess.promo = null; document.getElementById('promo-modal').classList.remove('show');
-            cFinish(fr, ff, tr, tf, color, san + '=' + type.toUpperCase(), false);
-        }
-
-        function cFinish(fr, ff, tr, tf, color, san, silent) {
-            chess.hist.push({ fr, ff, tr, tf, san, color });
-            chess.sel = null; chess.legal = [];
-            const nc = color === 'w' ? 'b' : 'w'; chess.turn = nc;
-            chess.inCheck = cIsInCheck(nc);
-            const hasL = cHasLegal(nc);
-            chess.mate = chess.inCheck && !hasL; chess.stale = !chess.inCheck && !hasL;
-            const fullSan = san + (chess.mate ? '#' : chess.inCheck ? '+' : '');
-            if (!silent) {
-                cAddLog(fullSan, color);
-                cBroadcast(`${color === 'w' ? myUsername : 'Groq-AI'} played ${fullSan}`);
-                cRender(); cUpdateSide();
-                if (chess.mate) cSetStat(`Checkmate! ${color === 'w' ? myUsername : 'Groq-AI'} wins! 🏆`);
-                else if (chess.stale) cSetStat('Stalemate — Draw!');
-                else if (chess.inCheck) { cSetStat(`Check! ${nc === 'w' ? myUsername : "Groq-AI"}'s king is in check`); if (nc === 'b') setTimeout(() => cAiMove(), 700); }
-                else { if (nc === 'w') cSetStat('Your turn (White)'); else { cSetStat('Groq-AI thinking…'); setTimeout(() => cAiMove(), 700); } }
-            }
-        }
-
-        // Move generation
-        function cGetLegal(r, f, color) {
-            return cPseudo(r, f, color).filter(([tr, tf]) => {
-                const sb = JSON.parse(JSON.stringify(chess.board));
-                const sep = chess.ep;
-                chess.board[tr][tf] = { ...chess.board[r][f] }; chess.board[r][f] = null;
-                if (chess.board[tr][tf].type === 'p' && sep && tr === sep[0] && tf === sep[1]) { const cr = color === 'w' ? tr + 1 : tr - 1; chess.board[cr][tf] = null; }
-                const ic = cIsInCheck(color);
-                chess.board = sb; chess.ep = sep;
-                return !ic;
-            });
-        }
-        function cPseudo(r, f, color) {
-            const p = chess.board[r][f]; if (!p || p.color !== color) return [];
-            const mv = [], opp = color === 'w' ? 'b' : 'w', dir = color === 'w' ? -1 : 1;
-            const ai = (tr, tf) => { if (tr < 0 || tr > 7 || tf < 0 || tf > 7) return false; const t = chess.board[tr][tf]; if (t && t.color === color) return false; mv.push([tr, tf]); return !t; };
-            const sl = (dr, df) => { let tr = r + dr, tf = f + df; while (tr >= 0 && tr < 8 && tf >= 0 && tf < 8) { const t = chess.board[tr][tf]; if (t) { if (t.color !== color) mv.push([tr, tf]); break; } mv.push([tr, tf]); tr += dr; tf += df; } };
-            switch (p.type) {
-                case 'p': {
-                    if (r + dir >= 0 && r + dir < 8 && !chess.board[r + dir][f]) { mv.push([r + dir, f]); const sr = color === 'w' ? 6 : 1; if (r === sr && !chess.board[r + 2 * dir][f]) mv.push([r + 2 * dir, f]); }
-                    for (const df of [-1, 1]) { const tr2 = r + dir, tf2 = f + df; if (tr2 >= 0 && tr2 < 8 && tf2 >= 0 && tf2 < 8) { const t = chess.board[tr2][tf2]; if (t && t.color === opp) mv.push([tr2, tf2]); if (chess.ep && tr2 === chess.ep[0] && tf2 === chess.ep[1]) mv.push([tr2, tf2]); } } break;
-                }
-                case 'r': sl(1, 0); sl(-1, 0); sl(0, 1); sl(0, -1); break;
-                case 'b': sl(1, 1); sl(1, -1); sl(-1, 1); sl(-1, -1); break;
-                case 'q': sl(1, 0); sl(-1, 0); sl(0, 1); sl(0, -1); sl(1, 1); sl(1, -1); sl(-1, 1); sl(-1, -1); break;
-                case 'n': [[2, 1], [2, -1], [-2, 1], [-2, -1], [1, 2], [1, -2], [-1, 2], [-1, -2]].forEach(([dr, df]) => ai(r + dr, f + df)); break;
-                case 'k': {
-                    [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]].forEach(([dr, df]) => ai(r + dr, f + df));
-                    const br = color === 'w' ? 7 : 0;
-                    if (!chess.inCheck && r === br && f === 4) {
-                        if (chess.castling[color + 'k'] && !chess.board[br][5] && !chess.board[br][6] && !cAtk(br, 5, opp) && !cAtk(br, 6, opp)) mv.push([br, 6]);
-                        if (chess.castling[color + 'q'] && !chess.board[br][3] && !chess.board[br][2] && !chess.board[br][1] && !cAtk(br, 3, opp) && !cAtk(br, 2, opp)) mv.push([br, 2]);
-                    } break;
-                }
-            }
-            return mv;
-        }
-        function cIsInCheck(color) {
-            let kr = -1, kf = -1;
-            for (let r = 0; r < 8; r++)for (let f = 0; f < 8; f++) { const p = chess.board[r][f]; if (p && p.type === 'k' && p.color === color) { kr = r; kf = f; } }
-            if (kr === -1) return false;
-            return cAtk(kr, kf, color === 'w' ? 'b' : 'w');
-        }
-        function cAtk(r, f, by) {
-            for (let sr = 0; sr < 8; sr++)for (let sf = 0; sf < 8; sf++) {
-                const p = chess.board[sr][sf]; if (!p || p.color !== by) continue;
-                if (cPseudo(sr, sf, by).some(([mr, mf]) => mr === r && mf === f)) return true;
-            }
-            return false;
-        }
-        function cHasLegal(color) {
-            for (let r = 0; r < 8; r++)for (let f = 0; f < 8; f++) {
-                const p = chess.board[r][f]; if (p && p.color === color && cGetLegal(r, f, color).length > 0) return true;
-            }
-            return false;
-        }
-        function cSAN(fr, ff, tr, tf, piece, target, color) {
-            const files = 'abcdefgh', ranks = '87654321';
-            if (piece.type === 'k' && Math.abs(tf - ff) === 2) return tf > ff ? 'O-O' : 'O-O-O';
-            let s = '';
-            if (piece.type !== 'p') s = piece.type.toUpperCase();
-            else if (target || (chess.ep && tr === chess.ep[0] && tf === chess.ep[1])) s = files[ff];
-            if (target || (piece.type === 'p' && chess.ep && tr === chess.ep[0] && tf === chess.ep[1])) s += 'x';
-            return s + files[tf] + ranks[tr];
-        }
-
-        // AI minimax depth 2
-        const PV = { p: 100, n: 320, b: 330, r: 500, q: 900, k: 20000 };
-        const PST = {
-            p: [[0, 0, 0, 0, 0, 0, 0, 0], [50, 50, 50, 50, 50, 50, 50, 50], [10, 10, 20, 30, 30, 20, 10, 10], [5, 5, 10, 25, 25, 10, 5, 5], [0, 0, 0, 20, 20, 0, 0, 0], [5, -5, -10, 0, 0, -10, -5, 5], [5, 10, 10, -20, -20, 10, 10, 5], [0, 0, 0, 0, 0, 0, 0, 0]],
-            n: [[-50, -40, -30, -30, -30, -30, -40, -50], [-40, -20, 0, 0, 0, 0, -20, -40], [-30, 0, 10, 15, 15, 10, 0, -30], [-30, 5, 15, 20, 20, 15, 5, -30], [-30, 0, 15, 20, 20, 15, 0, -30], [-30, 5, 10, 15, 15, 10, 5, -30], [-40, -20, 0, 5, 5, 0, -20, -40], [-50, -40, -30, -30, -30, -30, -40, -50]],
-            b: [[-20, -10, -10, -10, -10, -10, -10, -20], [-10, 0, 0, 0, 0, 0, 0, -10], [-10, 0, 5, 10, 10, 5, 0, -10], [-10, 5, 5, 10, 10, 5, 5, -10], [-10, 0, 10, 10, 10, 10, 0, -10], [-10, 10, 10, 10, 10, 10, 10, -10], [-10, 5, 0, 0, 0, 0, 5, -10], [-20, -10, -10, -10, -10, -10, -10, -20]],
-            r: [[0, 0, 0, 0, 0, 0, 0, 0], [5, 10, 10, 10, 10, 10, 10, 5], [-5, 0, 0, 0, 0, 0, 0, -5], [-5, 0, 0, 0, 0, 0, 0, -5], [-5, 0, 0, 0, 0, 0, 0, -5], [-5, 0, 0, 0, 0, 0, 0, -5], [-5, 0, 0, 0, 0, 0, 0, -5], [0, 0, 0, 5, 5, 0, 0, 0]],
-            q: [[-20, -10, -10, -5, -5, -10, -10, -20], [-10, 0, 0, 0, 0, 0, 0, -10], [-10, 0, 5, 5, 5, 5, 0, -10], [-5, 0, 5, 5, 5, 5, 0, -5], [0, 0, 5, 5, 5, 5, 0, -5], [-10, 5, 5, 5, 5, 5, 0, -10], [-10, 0, 5, 0, 0, 0, 0, -10], [-20, -10, -10, -5, -5, -10, -10, -20]],
-            k: [[-30, -40, -40, -50, -50, -40, -40, -30], [-30, -40, -40, -50, -50, -40, -40, -30], [-30, -40, -40, -50, -50, -40, -40, -30], [-30, -40, -40, -50, -50, -40, -40, -30], [-20, -30, -30, -40, -40, -30, -30, -20], [-10, -20, -20, -20, -20, -20, -20, -10], [20, 20, 0, 0, 0, 0, 20, 20], [20, 30, 10, 0, 0, 10, 30, 20]]
-        };
-        function cEval() {
-            let s = 0;
-            for (let r = 0; r < 8; r++)for (let f = 0; f < 8; f++) {
-                const p = chess.board[r][f]; if (!p) continue;
-                const pr = p.color === 'w' ? r : 7 - r;
-                s += (p.color === 'b' ? 1 : -1) * (PV[p.type] + (PST[p.type]?.[pr]?.[f] || 0));
-            }
-            return s;
-        }
-        function cAiMove() {
-            if (chess.turn !== 'b' || chess.mate || chess.stale || !chess.started) return;
-            cAiRunning = true;
-            setTimeout(() => {
-                const move = cMinimax(); cAiRunning = false;
-                if (move) { chess.sel = null; chess.legal = []; cExec(move.fr, move.ff, move.tr, move.tf, 'b'); }
-            }, 350);
-        }
-        function cMinimax() {
-            let bestS = -Infinity, bestM = null;
-            const sBoard = JSON.parse(JSON.stringify(chess.board)), sCast = JSON.parse(JSON.stringify(chess.castling)), sEP = chess.ep, sTurn = chess.turn, sCheck = chess.inCheck;
-            for (let fr = 0; fr < 8; fr++)for (let ff = 0; ff < 8; ff++) {
-                const p = chess.board[fr][ff]; if (!p || p.color !== 'b') continue;
-                const moves = cGetLegal(fr, ff, 'b');
-                for (const [tr, tf] of moves) {
-                    // Simulate
-                    const nb = JSON.parse(JSON.stringify(chess.board));
-                    chess.board = nb;
-                    const piece = chess.board[fr][ff];
-                    chess.board[tr][tf] = piece; chess.board[fr][ff] = null;
-                    if (piece.type === 'p' && (tr === 0 || tr === 7)) chess.board[tr][tf] = { type: 'q', color: 'b' };
-                    chess.turn = 'w'; chess.inCheck = cIsInCheck('w');
-                    const score = cAB(1, false, -Infinity, Infinity);
-                    chess.board = sBoard; chess.castling = sCast; chess.ep = sEP; chess.turn = sTurn; chess.inCheck = sCheck;
-                    if (score > bestS) { bestS = score; bestM = { fr, ff, tr, tf }; }
-                }
-            }
-            return bestM;
-        }
-        function cAB(depth, maximizing, alpha, beta) {
-            if (depth === 0) return cEval();
-            const color = maximizing ? 'b' : 'w';
-            let best = maximizing ? -Infinity : Infinity; let moved = false;
-            const sB = JSON.parse(JSON.stringify(chess.board)), sC = JSON.parse(JSON.stringify(chess.castling)), sE = chess.ep, sTu = chess.turn, sCh = chess.inCheck;
-            outer: for (let fr = 0; fr < 8; fr++)for (let ff = 0; ff < 8; ff++) {
-                const p = chess.board[fr][ff]; if (!p || p.color !== color) continue;
-                chess.turn = color; chess.inCheck = sCh;
-                const ms = cGetLegal(fr, ff, color);
-                for (const [tr, tf] of ms) {
-                    moved = true;
-                    const nb = JSON.parse(JSON.stringify(sB));
-                    chess.board = nb;
-                    const piece = chess.board[fr][ff];
-                    chess.board[tr][tf] = piece; chess.board[fr][ff] = null;
-                    if (piece.type === 'p' && (tr === 0 || tr === 7)) chess.board[tr][tf] = { type: 'q', color };
-                    chess.turn = color === 'w' ? 'b' : 'w'; chess.inCheck = cIsInCheck(chess.turn);
-                    const sc = cAB(depth - 1, !maximizing, alpha, beta);
-                    chess.board = sB; chess.castling = sC; chess.ep = sE; chess.turn = sTu; chess.inCheck = sCh;
-                    if (maximizing) { best = Math.max(best, sc); alpha = Math.max(alpha, best); }
-                    else { best = Math.min(best, sc); beta = Math.min(beta, best); }
-                    if (beta <= alpha) break outer;
-                }
-            }
-            return moved ? best : (maximizing ? -99999 : 99999);
-        }
-
-        function chessUndo() {
-            if (chess.hist.length < 2 || cAiRunning) return;
-            const moves = chess.hist.slice(0, -2);
-            chess = chessInitState(); chess.started = true;
-            document.getElementById('clog').innerHTML = '';
-            for (const m of moves) {
-                const piece = chess.board[m.fr][m.ff]; if (!piece) continue;
-                const target = chess.board[m.tr][m.tf];
-                if (target) { m.color === 'w' ? chess.capW.push(target.type) : chess.capB.push(target.type); }
-                chess.board[m.tr][m.tf] = { ...piece }; chess.board[m.fr][m.ff] = null;
-                if (piece.type === 'k') { chess.castling[m.color + 'k'] = false; chess.castling[m.color + 'q'] = false; }
-                if (piece.type === 'r') { if (m.ff === 0) chess.castling[m.color + 'q'] = false; if (m.ff === 7) chess.castling[m.color + 'k'] = false; }
-                chess.ep = null; if (piece.type === 'p' && Math.abs(m.tr - m.fr) === 2) chess.ep = [(m.fr + m.tr) / 2, m.ff];
-                if (piece.type === 'p' && (m.tr === 0 || m.tr === 7)) chess.board[m.tr][m.tf] = { type: 'q', color: m.color };
-                chess.hist.push(m); chess.turn = m.color === 'w' ? 'b' : 'w';
-                cAddLog(m.san, m.color);
-            }
-            chess.inCheck = cIsInCheck(chess.turn);
-            cRender(); cUpdateSide(); cSetStat('Your turn (White)');
-        }
-
-        function chessReset() { cAiRunning = false; chessInit(); cBroadcast('New Chess game started!'); }
-        function cBroadcast(event) {
-            if (!ws || ws.readyState !== 1) return;
-            wsSend({ sender: myUsername, message: `__CHESS__:${JSON.stringify({ event, turn: chess.turn })}`, image: null });
-            appendGameMsg(event);
-        }
-        function handleChessSync(data) {
-            try { const d = JSON.parse(data.message.replace('__CHESS__:', '')); appendGameMsg(d.event || 'Chess update'); } catch (e) { }
-        }
-
-        // Build chess coords
-        (function () {
-            const cf = document.getElementById('cfiles');
-            if (cf) { 'abcdefgh'.split('').forEach(f => { const s = document.createElement('span'); s.textContent = f; cf.appendChild(s); }); }
-            const cr = document.getElementById('cranks');
-            if (cr) { for (let r = 0; r < 8; r++) { const s = document.createElement('span'); s.textContent = 8 - r; cr.appendChild(s); } }
-        })();
+        });
     </script>
 </body>
 
