@@ -5,8 +5,10 @@
 let ws = null;
 let myUsername = '';
 let myRoom = '';
-let gameMode = false;   // true when game is fullscreen on mobile
-let currentTab = 'ludo'; // 'ludo' or 'chess'
+let gameMode = false;
+let currentTab = null;  // null = no game tab selected initially
+let ludoStarted = false;
+let chessStarted = false;
 
 // ── Join Chat ──
 function joinChat() {
@@ -27,7 +29,6 @@ function joinChat() {
         if (d.message?.startsWith('__LUDO__:')) { handleLudoSync(d); return; }
         if (d.message?.startsWith('__CHESS__:')) { handleChessSync(d); return; }
         appendMsg(d.sender, d.message, d.image);
-        // Also push to live chat overlay
         appendLiveMsg(d.sender, d.message);
     };
 
@@ -35,12 +36,23 @@ function joinChat() {
         appendMsg('System', 'Connection lost. Refresh.');
         appendLiveMsg('System', 'Connection lost.');
     };
+}
 
-    // Start games after a short delay
-    setTimeout(() => {
-        if (typeof ludoStart === 'function') ludoStart();
-        if (typeof chessInit === 'function') chessInit();
-    }, 500);
+// ── Start game functions (called from start screens) ──
+function startLudoGame() {
+    if (!myUsername) { alert('Join a room first!'); return; }
+    document.getElementById('ludo-start-screen').style.display = 'none';
+    document.getElementById('ludo-game-area').style.display = 'block';
+    ludoStarted = true;
+    if (typeof ludoStart === 'function') ludoStart();
+}
+
+function startChessGame() {
+    if (!myUsername) { alert('Join a room first!'); return; }
+    document.getElementById('chess-start-screen').style.display = 'none';
+    document.getElementById('chess-game-area').style.display = 'block';
+    chessStarted = true;
+    if (typeof chessInit === 'function') chessInit();
 }
 
 // ── File upload ──
@@ -63,16 +75,14 @@ function sendMsg() {
     inp.value = '';
 }
 
-// ── Send from live chat overlay ──
 function sendLiveMsg() {
     const inp = document.getElementById('live-chat-inp');
     const t = inp.value.trim();
-    if (!t) return;
+    if (!t || !ws) return;
     ws.send(JSON.stringify({ sender: myUsername, message: t, image: null }));
     inp.value = '';
 }
 
-// ── WebSocket send helper ──
 function wsSend(obj) {
     if (ws && ws.readyState === 1) ws.send(JSON.stringify(obj));
 }
@@ -127,7 +137,6 @@ function appendMsg(sender, text, image) {
     box.scrollTop = box.scrollHeight;
 }
 
-// ── Append game event to main chat ──
 function appendGameMsg(txt) {
     const box = document.getElementById('chat-msgs');
     const d = document.createElement('div');
@@ -135,12 +144,10 @@ function appendGameMsg(txt) {
     d.textContent = '🎮 ' + txt;
     box.appendChild(d);
     box.scrollTop = box.scrollHeight;
-
-    // Also push to live overlay
     appendLiveMsg('🎮', txt);
 }
 
-// ── Live chat overlay (for game mode) ──
+// ── Live chat overlay ──
 function appendLiveMsg(sender, text) {
     const box = document.getElementById('live-chat-msgs');
     if (!box) return;
@@ -154,10 +161,10 @@ function appendLiveMsg(sender, text) {
     if (sender === myUsername) {
         nameSpan.classList.add('live-name-user');
         nameSpan.textContent = 'You:';
-    } else if (sender.includes('Groq')) {
+    } else if (sender.includes && sender.includes('Groq')) {
         nameSpan.classList.add('live-name-groq');
         nameSpan.textContent = 'Groq:';
-    } else if (sender.includes('Router')) {
+    } else if (sender.includes && sender.includes('Router')) {
         nameSpan.classList.add('live-name-router');
         nameSpan.textContent = 'Router:';
     } else if (sender === 'System' || sender === '🎮') {
@@ -172,8 +179,7 @@ function appendLiveMsg(sender, text) {
     msg.appendChild(document.createTextNode(' ' + (text || '')));
     box.appendChild(msg);
 
-    // Keep only last 20 messages in overlay
-    while (box.children.length > 20) {
+    while (box.children.length > 15) {
         box.removeChild(box.firstChild);
     }
 
@@ -184,14 +190,19 @@ function appendLiveMsg(sender, text) {
 function switchTab(tab) {
     currentTab = tab;
 
-    document.querySelectorAll('.tab-btn').forEach((b, i) => {
-        b.classList.toggle('active', ['ludo', 'chess'][i] === tab);
-    });
+    // Update tab button styles
+    document.getElementById('tab-ludo').classList.toggle('active', tab === 'ludo');
+    document.getElementById('tab-chess').classList.toggle('active', tab === 'chess');
 
+    // Show the correct pane
     document.getElementById('pane-ludo').classList.toggle('vis', tab === 'ludo');
     document.getElementById('pane-chess').classList.toggle('vis', tab === 'chess');
 
-    // On mobile, entering a game tab also activates game fullscreen mode
+    // Show game area
+    const gameArea = document.getElementById('game-area');
+    gameArea.classList.add('active');
+
+    // On mobile, enter game fullscreen mode
     if (window.innerWidth < 800 && myUsername) {
         enterGameMode();
     }
@@ -202,7 +213,6 @@ function enterGameMode() {
     gameMode = true;
     const gameArea = document.getElementById('game-area');
     const chatPanel = document.querySelector('.chat-panel');
-
     gameArea.classList.add('active');
     if (chatPanel) chatPanel.style.display = 'none';
 }
@@ -215,15 +225,22 @@ function exitGameMode() {
     if (window.innerWidth < 800) {
         gameArea.classList.remove('active');
         if (chatPanel) chatPanel.style.display = 'flex';
+
+        // Deselect tab
+        currentTab = null;
+        document.getElementById('tab-ludo').classList.remove('active');
+        document.getElementById('tab-chess').classList.remove('active');
     }
 }
 
-// ── Handle resize: if going desktop, cleanup mobile mode ──
+// ── Handle resize ──
 window.addEventListener('resize', () => {
     if (window.innerWidth >= 800) {
         const gameArea = document.getElementById('game-area');
         const chatPanel = document.querySelector('.chat-panel');
-        gameArea.classList.remove('active');
+        if (currentTab) {
+            gameArea.classList.add('active');
+        }
         if (chatPanel) chatPanel.style.display = 'flex';
         gameMode = false;
     }

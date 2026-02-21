@@ -6,7 +6,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>AI Squad – Chat + Games</title>
     <meta name="description" content="AI Squad - Chat with AI bros and play Ludo & Chess together in real-time">
-    <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Inter:wght@400;500;600&display=swap"
+        rel="stylesheet">
     <link rel="stylesheet" href="css/style.css">
 </head>
 
@@ -18,8 +20,8 @@
             <h1>⚡ SQUAD.GG</h1>
             <div class="room-badge" id="room-badge">Not connected</div>
             <div class="tab-bar">
-                <button class="tab-btn active" onclick="switchTab('ludo')">🎲 Ludo</button>
-                <button class="tab-btn" onclick="switchTab('chess')">♟ Chess</button>
+                <button class="tab-btn" id="tab-ludo" onclick="switchTab('ludo')">🎲 Ludo</button>
+                <button class="tab-btn" id="tab-chess" onclick="switchTab('chess')">♟ Chess</button>
             </div>
         </div>
 
@@ -52,91 +54,112 @@
 
                 <!-- LUDO PANE -->
                 <div class="gpane vis" id="pane-ludo">
-                    <div class="pane-hdr">
-                        <button class="btn-back" onclick="exitGameMode()">← Back</button>
-                        <h2>🎲 Ludo — You vs AI Squad</h2>
-                        <button class="bnew" onclick="ludoReset()">New Game</button>
+                    <!-- Start screen (shown before game starts) -->
+                    <div class="game-start-screen" id="ludo-start-screen">
+                        <div class="game-icon">🎲</div>
+                        <h2>Ludo</h2>
+                        <p>Play Ludo with the AI Squad! You're 🔴 Red, Groq-AI is 🟢 Green, Router-AI is 🔵 Blue.</p>
+                        <button class="btn-start-game" onclick="startLudoGame()">Start Ludo →</button>
                     </div>
-                    <div class="gpane-inner">
-                        <div class="lctrl">
-                            <div class="dice-wrap">
-                                <div class="dice doff" id="ldice" onclick="ludoRoll()">🎲</div>
-                                <div>
-                                    <div style="font-size:.75em;color:var(--text2);margin-bottom:3px;">Players</div>
-                                    <div class="tdots" id="tdots"></div>
+                    <!-- Actual game (hidden until start) -->
+                    <div id="ludo-game-area" style="display:none;width:100%;">
+                        <div class="pane-hdr">
+                            <button class="btn-back" onclick="exitGameMode()">← Back</button>
+                            <h2>🎲 Ludo — You vs AI Squad</h2>
+                            <button class="bnew" onclick="ludoReset()">New Game</button>
+                        </div>
+                        <div class="gpane-inner">
+                            <div class="lctrl">
+                                <div class="dice-wrap">
+                                    <div class="dice doff" id="ldice" onclick="ludoRoll()">🎲</div>
+                                    <div>
+                                        <div style="font-size:.72em;color:var(--text2);margin-bottom:3px;">Players</div>
+                                        <div class="tdots" id="tdots"></div>
+                                    </div>
+                                </div>
+                                <div class="lstat" id="lstat">Roll the dice!</div>
+                            </div>
+                            <div style="position:relative;">
+                                <div id="ludo-board"></div>
+                                <div class="winner-ov" id="ludo-winner">
+                                    <div class="wemoji" id="wemoji">🏆</div>
+                                    <div class="wtext" id="wtext">WINNER!</div>
+                                    <button class="btn-primary" onclick="ludoReset()" style="margin-top:8px;">Play
+                                        Again</button>
                                 </div>
                             </div>
-                            <div class="lstat" id="lstat">Join a room to play</div>
+                            <div class="llog" id="llog">Game started! You are 🔴 Red.</div>
                         </div>
-                        <div style="position:relative;">
-                            <div id="ludo-board"></div>
-                            <div class="winner-ov" id="ludo-winner">
-                                <div class="wemoji" id="wemoji">🏆</div>
-                                <div class="wtext" id="wtext">WINNER!</div>
-                                <button class="btn-primary" onclick="ludoReset()" style="margin-top:8px;">Play Again
-                                </button>
-                            </div>
-                        </div>
-                        <div class="llog" id="llog">Join a room to start playing…</div>
                     </div>
                 </div>
 
                 <!-- CHESS PANE -->
                 <div class="gpane" id="pane-chess">
-                    <div class="pane-hdr">
-                        <button class="btn-back" onclick="exitGameMode()">← Back</button>
-                        <h2>♟ Chess — You (White) vs Groq-AI (Black)</h2>
-                        <button class="bnew" onclick="chessReset()">New Game</button>
+                    <!-- Start screen -->
+                    <div class="game-start-screen" id="chess-start-screen">
+                        <div class="game-icon">♟️</div>
+                        <h2>Chess</h2>
+                        <p>Challenge Groq-AI to a game of Chess! You play White, Groq-AI plays Black with minimax AI.
+                        </p>
+                        <button class="btn-start-game" onclick="startChessGame()">Start Chess →</button>
                     </div>
-                    <div class="chess-wrap">
-                        <div class="chess-board-outer">
-                            <div class="chess-file-labels" id="cfiles"></div>
-                            <div class="chess-ranks-row">
-                                <div class="chess-rank-labels" id="cranks"></div>
-                                <div style="position:relative;">
-                                    <div id="chess-board"></div>
-                                    <div class="promo-modal" id="promo-modal">
-                                        <div class="promo-title">Promote pawn to:</div>
-                                        <div class="promo-pieces" id="promo-pieces"></div>
+                    <!-- Actual game (hidden until start) -->
+                    <div id="chess-game-area" style="display:none;width:100%;">
+                        <div class="pane-hdr">
+                            <button class="btn-back" onclick="exitGameMode()">← Back</button>
+                            <h2>♟ Chess — You (White) vs Groq-AI (Black)</h2>
+                            <button class="bnew" onclick="chessReset()">New Game</button>
+                        </div>
+                        <div class="chess-wrap">
+                            <div class="chess-board-outer">
+                                <div class="chess-file-labels" id="cfiles"></div>
+                                <div class="chess-ranks-row">
+                                    <div class="chess-rank-labels" id="cranks"></div>
+                                    <div style="position:relative;">
+                                        <div id="chess-board"></div>
+                                        <div class="promo-modal" id="promo-modal">
+                                            <div class="promo-title">Promote pawn to:</div>
+                                            <div class="promo-pieces" id="promo-pieces"></div>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
-                        </div>
-                        <div class="chess-side">
-                            <div class="cbox">
-                                <h3>PLAYERS</h3>
-                                <div class="pslot aturn" id="cslot-w">
-                                    <div class="pdot" style="background:#eee;border:1px solid #666;"></div>
-                                    <div class="pname" id="cname-w">You (White)</div>
-                                    <div class="pstat" id="cstatw">●</div>
+                            <div class="chess-side">
+                                <div class="cbox">
+                                    <h3>PLAYERS</h3>
+                                    <div class="pslot aturn" id="cslot-w">
+                                        <div class="pdot" style="background:#eee;border:1px solid #666;"></div>
+                                        <div class="pname" id="cname-w">You (White)</div>
+                                        <div class="pstat" id="cstatw">●</div>
+                                    </div>
+                                    <div class="pslot" id="cslot-b">
+                                        <div class="pdot" style="background:#555;border:1px solid #999;"></div>
+                                        <div class="pname">Groq-AI (Black)</div>
+                                        <div class="pstat" id="cstatb">●</div>
+                                    </div>
                                 </div>
-                                <div class="pslot" id="cslot-b">
-                                    <div class="pdot" style="background:#555;border:1px solid #999;"></div>
-                                    <div class="pname">Groq-AI (Black)</div>
-                                    <div class="pstat" id="cstatb">●</div>
+                                <div class="cbox">
+                                    <h3>STATUS</h3>
+                                    <div class="cstatus" id="cstatus">Press Start to play</div>
                                 </div>
+                                <div class="cbox">
+                                    <h3>CAPTURED</h3>
+                                    <div style="font-size:.7em;color:var(--text2);margin-bottom:3px;">White took:</div>
+                                    <div class="ccap" id="cap-w"></div>
+                                    <div style="font-size:.7em;color:var(--text2);margin:5px 0 3px;">Black took:</div>
+                                    <div class="ccap" id="cap-b"></div>
+                                </div>
+                                <div class="cbox">
+                                    <h3>MOVES</h3>
+                                    <div class="clog" id="clog"></div>
+                                </div>
+                                <button class="bact" onclick="chessUndo()">↩ Undo last move</button>
                             </div>
-                            <div class="cbox">
-                                <h3>STATUS</h3>
-                                <div class="cstatus" id="cstatus">Join a room to play</div>
-                            </div>
-                            <div class="cbox">
-                                <h3>CAPTURED</h3>
-                                <div style="font-size:.7em;color:var(--text2);margin-bottom:3px;">White took:</div>
-                                <div class="ccap" id="cap-w"></div>
-                                <div style="font-size:.7em;color:var(--text2);margin:5px 0 3px;">Black took:</div>
-                                <div class="ccap" id="cap-b"></div>
-                            </div>
-                            <div class="cbox">
-                                <h3>MOVES</h3>
-                                <div class="clog" id="clog"></div>
-                            </div>
-                            <button class="bact" onclick="chessUndo()">↩ Undo last move</button>
                         </div>
                     </div>
                 </div>
 
-                <!-- LIVE CHAT OVERLAY (for game mode) -->
+                <!-- LIVE CHAT OVERLAY (thin strip, for game mode) -->
                 <div class="live-chat-overlay" id="live-chat-overlay">
                     <div class="live-chat-msgs" id="live-chat-msgs"></div>
                     <div class="live-chat-input">
@@ -152,7 +175,6 @@
 
     </div>
 
-    <!-- Scripts: app core first, then game engines -->
     <script src="js/app.js"></script>
     <script src="games/ludo.js"></script>
     <script src="games/chess.js"></script>

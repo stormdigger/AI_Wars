@@ -478,6 +478,4 @@ function ludoReset() {
     }
 }
 
-// ── Init board on load ──
-ludoBuildBoard();
-lRenderTokens();
+// Board is built when ludoStart() is called from the start screen
