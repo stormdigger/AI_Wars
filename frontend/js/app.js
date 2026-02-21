@@ -1,548 +1,230 @@
-/**
- * Squad.GG – Main App Controller (app.js)
- *
- * Handles:
- *  - WebSocket connection & message routing
- *  - Chat rendering (Instagram Live overlay style)
- *  - Lobby & ready system
- *  - Join vote handling
- *  - Game coordination (Ludo ↔ Chess tab switching)
- *  - Game special event → backend broadcast
- *  - Mobile/desktop chat toggle
- */
+// ═══════════════════════════════════════════
+// AI SQUAD – App Core (Chat, WebSocket, Game Mode)
+// ═══════════════════════════════════════════
 
-(function () {
-  "use strict";
+let ws = null;
+let myUsername = '';
+let myRoom = '';
+let gameMode = false;   // true when game is fullscreen on mobile
+let currentTab = 'ludo'; // 'ludo' or 'chess'
 
-  // ── Config ─────────────────────────────────────────────────
-  const WS_HOST = "ai-wars.onrender.com";  // ← change if needed
+// ── Join Chat ──
+function joinChat() {
+    myUsername = document.getElementById('inp-user').value.trim();
+    myRoom = document.getElementById('inp-room').value.trim();
+    if (!myUsername || !myRoom) { alert('Fill both fields!'); return; }
 
-  // ── State ──────────────────────────────────────────────────
-  let ws           = null;
-  let myUsername   = "";
-  let myRoom       = "";
-  let activeGame   = "ludo";   // "ludo" | "chess"
-  let gameStarted  = false;
-  let isSpectator  = false;
-  let myColor      = "";       // assigned color for current game
-  let lobbyPlayers = {};       // username → {ready, color}
-  let iAmHost      = false;
-  let unreadCount  = 0;
-  let chatExpanded = false;
-  let pendingVote  = null;     // {requester, timer}
-  let selectedGameType = "ludo";
+    document.getElementById('setup-screen').style.display = 'none';
+    document.getElementById('chat-live').style.display = 'flex';
+    document.getElementById('room-badge').textContent = 'Room ' + myRoom;
+    document.getElementById('cname-w').textContent = myUsername + ' (White)';
 
-  // ── DOM refs (populated after DOMContentLoaded) ─────────────
-  let dom = {};
-
-  // ── Init ────────────────────────────────────────────────────
-  document.addEventListener("DOMContentLoaded", () => {
-    dom = {
-      setupScreen:    document.getElementById("setup-screen"),
-      app:            document.getElementById("app"),
-      inpUser:        document.getElementById("inp-user"),
-      inpRoom:        document.getElementById("inp-room"),
-      roomBadge:      document.getElementById("room-badge"),
-      chatOverlay:    document.getElementById("chat-overlay"),
-      chatMessages:   document.getElementById("chat-messages"),
-      chatInput:      document.getElementById("chat-inp"),
-      chatBadge:      document.getElementById("chat-badge"),
-      chatToggleBtn:  document.getElementById("chat-toggle-btn"),
-      gameLog:        document.getElementById("game-log"),
-      lobbyView:      document.getElementById("lobby-view"),
-      gameView:       document.getElementById("game-view"),
-      ludoPane:       document.getElementById("pane-ludo"),
-      chessPane:      document.getElementById("pane-chess"),
-      ludoBoardWrap:  document.getElementById("ludo-board-wrap"),
-      voteBanner:     document.getElementById("vote-banner"),
-      tabLudo:        document.getElementById("tab-ludo"),
-      tabChess:       document.getElementById("tab-chess"),
-    };
-
-    // Keyboard shortcut: Enter to join
-    dom.inpRoom.addEventListener("keypress", e => { if (e.key==="Enter") joinRoom(); });
-    dom.inpUser.addEventListener("keypress", e => { if (e.key==="Enter") dom.inpRoom.focus(); });
-
-    // Restore last session (UX nicety)
-    const saved = sessionStorage.getItem("squad_username");
-    if (saved) dom.inpUser.value = saved;
-  });
-
-  // ── Join ────────────────────────────────────────────────────
-  window.joinRoom = function () {
-    myUsername = (dom.inpUser.value || "").trim();
-    myRoom     = (dom.inpRoom.value || "").trim();
-    if (!myUsername || !myRoom) { showToast("Enter a name and room ID!"); return; }
-
-    sessionStorage.setItem("squad_username", myUsername);
-    dom.setupScreen.style.display = "none";
-    dom.app.classList.add("visible");
-    dom.roomBadge.textContent = "Room " + myRoom;
-
-    connectWS();
-  };
-
-  // ── WebSocket ───────────────────────────────────────────────
-  function connectWS() {
-    const proto = location.protocol === "https:" ? "wss:" : "ws:";
-    ws = new WebSocket(`${proto}//${WS_HOST}/ws/${encodeURIComponent(myRoom)}/${encodeURIComponent(myUsername)}`);
-
-    ws.onopen = () => { console.log("[WS] connected"); };
+    const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    ws = new WebSocket(`${proto}//ai-wars.onrender.com/ws/${encodeURIComponent(myRoom)}/${encodeURIComponent(myUsername)}`);
 
     ws.onmessage = e => {
-      let msg;
-      try { msg = JSON.parse(e.data); } catch { return; }
-      routeMessage(msg);
+        const d = JSON.parse(e.data);
+        if (d.message?.startsWith('__LUDO__:')) { handleLudoSync(d); return; }
+        if (d.message?.startsWith('__CHESS__:')) { handleChessSync(d); return; }
+        appendMsg(d.sender, d.message, d.image);
+        // Also push to live chat overlay
+        appendLiveMsg(d.sender, d.message);
     };
 
     ws.onclose = () => {
-      appendSystemMsg("⚠️ Disconnected. Reconnecting in 3s…");
-      setTimeout(connectWS, 3000);
+        appendMsg('System', 'Connection lost. Refresh.');
+        appendLiveMsg('System', 'Connection lost.');
     };
 
-    ws.onerror = () => ws.close();
-  }
+    // Start games after a short delay
+    setTimeout(() => {
+        if (typeof ludoStart === 'function') ludoStart();
+        if (typeof chessInit === 'function') chessInit();
+    }, 500);
+}
 
-  function wsSend(obj) {
-    if (ws && ws.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify(obj));
-    }
-  }
+// ── File upload ──
+function handleFile(inp) {
+    const f = inp.files[0];
+    if (!f) return;
+    if (f.size > 2097152) { alert('Max 2MB!'); return; }
+    const r = new FileReader();
+    r.onload = e => ws.send(JSON.stringify({ sender: myUsername, message: '', image: e.target.result }));
+    r.readAsDataURL(f);
+    inp.value = '';
+}
 
-  // ── Message Router ──────────────────────────────────────────
-  function routeMessage(msg) {
-    switch (msg.type) {
-      case "chat":
-        appendChatMsg(msg.sender, msg.message, msg.image);
-        if (!chatExpanded) bumpUnread();
-        break;
+// ── Send message ──
+function sendMsg() {
+    const inp = document.getElementById('chat-inp');
+    const t = inp.value.trim();
+    if (!t) return;
+    ws.send(JSON.stringify({ sender: myUsername, message: t, image: null }));
+    inp.value = '';
+}
 
-      case "system":
-        appendSystemMsg(msg.message);
-        break;
+// ── Send from live chat overlay ──
+function sendLiveMsg() {
+    const inp = document.getElementById('live-chat-inp');
+    const t = inp.value.trim();
+    if (!t) return;
+    ws.send(JSON.stringify({ sender: myUsername, message: t, image: null }));
+    inp.value = '';
+}
 
-      case "lobby_update":
-        handleLobbyUpdate(msg);
-        break;
+// ── WebSocket send helper ──
+function wsSend(obj) {
+    if (ws && ws.readyState === 1) ws.send(JSON.stringify(obj));
+}
 
-      case "game_start":
-        handleGameStart(msg);
-        break;
+// ── Append message to main chat ──
+function appendMsg(sender, text, image) {
+    const box = document.getElementById('chat-msgs');
+    const w = document.createElement('div');
 
-      case "game_sync":
-        handleGameSync(msg);
-        break;
-
-      case "vote_request":
-        handleVoteRequest(msg);
-        break;
-
-      case "vote_result":
-        appendSystemMsg(msg.message);
-        if (pendingVote && pendingVote.timer) clearTimeout(pendingVote.timer);
-        pendingVote = null;
-        hideBanner();
-        break;
-
-      default:
-        // Legacy format: old-style {sender, message}
-        if (msg.sender && msg.message) {
-          appendChatMsg(msg.sender, msg.message, msg.image);
-        }
-        break;
-    }
-  }
-
-  // ── Chat Rendering ─────────────────────────────────────────
-  function appendChatMsg(sender, text, image) {
-    const box = dom.chatMessages;
-    const wrap = document.createElement("div");
-
-    let cls = "msg-other";
-    if      (sender === myUsername)          cls = "msg-me";
-    else if (sender === "System")            { appendSystemMsg(text); return; }
-    else if (sender.includes("Groq"))        cls = "msg-groq";
-    else if (sender.includes("Router"))      cls = "msg-router";
-
-    wrap.className = "msg " + cls;
-
-    if (cls !== "msg-me") {
-      const n = document.createElement("div");
-      n.className = "msg-name";
-      n.textContent = sender;
-      wrap.appendChild(n);
+    if (sender === 'System') {
+        w.className = 'ms';
+        w.textContent = text;
+        box.appendChild(w);
+        box.scrollTop = box.scrollHeight;
+        return;
     }
 
-    const b = document.createElement("div");
-    b.className = "msg-bubble";
+    let cls = 'mot';
+    if (sender === myUsername) cls = 'mme';
+    else if (sender.includes('Groq')) cls = 'mgq';
+    else if (sender.includes('Router')) cls = 'mrt';
+
+    w.className = 'mw ' + cls;
+
+    if (cls !== 'mme') {
+        const n = document.createElement('div');
+        n.className = 'mn';
+        n.textContent = sender;
+        w.appendChild(n);
+    }
+
+    const b = document.createElement('div');
+    b.className = 'mb';
 
     if (image) {
-      const img = document.createElement("img");
-      img.src = image;
-      img.style.cssText = "max-width:100%;border-radius:6px;display:block;";
-      b.appendChild(img);
-      if (text) {
-        const t = document.createElement("div");
-        t.style.cssText = "font-size:.78em;opacity:.7;margin-top:4px;";
-        t.textContent = text;
-        b.appendChild(t);
-      }
+        const i = document.createElement('img');
+        i.src = image;
+        i.style.cssText = 'max-width:100%;border-radius:6px;';
+        b.appendChild(i);
+        if (text) {
+            const t2 = document.createElement('div');
+            t2.style.cssText = 'font-size:.78em;opacity:.7;margin-top:4px;';
+            t2.textContent = text;
+            b.appendChild(t2);
+        }
     } else {
-      b.textContent = text;
+        b.textContent = text;
     }
 
-    wrap.appendChild(b);
-    box.appendChild(wrap);
-    trimChatOverflow();
+    w.appendChild(b);
+    box.appendChild(w);
     box.scrollTop = box.scrollHeight;
-  }
+}
 
-  function appendSystemMsg(text) {
-    const box = dom.chatMessages;
-    const d = document.createElement("div");
-    d.className = "msg-system";
-    d.textContent = text;
+// ── Append game event to main chat ──
+function appendGameMsg(txt) {
+    const box = document.getElementById('chat-msgs');
+    const d = document.createElement('div');
+    d.className = 'mgame';
+    d.textContent = '🎮 ' + txt;
     box.appendChild(d);
     box.scrollTop = box.scrollHeight;
-  }
 
-  function appendGameEvent(text) {
-    const box = dom.chatMessages;
-    const d = document.createElement("div");
-    d.className = "msg-game-event";
-    d.textContent = "🎮 " + text;
-    box.appendChild(d);
+    // Also push to live overlay
+    appendLiveMsg('🎮', txt);
+}
+
+// ── Live chat overlay (for game mode) ──
+function appendLiveMsg(sender, text) {
+    const box = document.getElementById('live-chat-msgs');
+    if (!box) return;
+
+    const msg = document.createElement('div');
+    msg.className = 'live-msg';
+
+    const nameSpan = document.createElement('span');
+    nameSpan.className = 'live-name';
+
+    if (sender === myUsername) {
+        nameSpan.classList.add('live-name-user');
+        nameSpan.textContent = 'You:';
+    } else if (sender.includes('Groq')) {
+        nameSpan.classList.add('live-name-groq');
+        nameSpan.textContent = 'Groq:';
+    } else if (sender.includes('Router')) {
+        nameSpan.classList.add('live-name-router');
+        nameSpan.textContent = 'Router:';
+    } else if (sender === 'System' || sender === '🎮') {
+        nameSpan.classList.add('live-name-system');
+        nameSpan.textContent = sender === '🎮' ? '🎮' : '📢';
+    } else {
+        nameSpan.classList.add('live-name-user');
+        nameSpan.textContent = sender + ':';
+    }
+
+    msg.appendChild(nameSpan);
+    msg.appendChild(document.createTextNode(' ' + (text || '')));
+    box.appendChild(msg);
+
+    // Keep only last 20 messages in overlay
+    while (box.children.length > 20) {
+        box.removeChild(box.firstChild);
+    }
+
     box.scrollTop = box.scrollHeight;
-    if (!chatExpanded) bumpUnread();
-  }
+}
 
-  // Keep overlay from growing too large in collapsed mode
-  function trimChatOverflow() {
-    if (chatExpanded) return;
-    const children = dom.chatMessages.children;
-    while (children.length > 40) dom.chatMessages.removeChild(children[0]);
-  }
+// ── Tab Switching ──
+function switchTab(tab) {
+    currentTab = tab;
 
-  function bumpUnread() {
-    unreadCount++;
-    dom.chatBadge.textContent = unreadCount > 9 ? "9+" : unreadCount;
-    dom.chatBadge.classList.add("visible");
-  }
-
-  // ── Chat controls ──────────────────────────────────────────
-  window.toggleChat = function () {
-    chatExpanded = !chatExpanded;
-    dom.chatOverlay.classList.toggle("expanded", chatExpanded);
-    dom.chatOverlay.classList.toggle("collapsed", !chatExpanded);
-    if (chatExpanded) {
-      unreadCount = 0;
-      dom.chatBadge.classList.remove("visible");
-      dom.chatMessages.scrollTop = dom.chatMessages.scrollHeight;
-    }
-  };
-
-  window.sendMsg = function () {
-    const inp = dom.chatInput;
-    const text = inp.value.trim();
-    if (!text) return;
-    wsSend({ type: "chat", sender: myUsername, message: text, image: null });
-    inp.value = "";
-    // Also show locally immediately
-    appendChatMsg(myUsername, text, null);
-  };
-
-  window.sendMsgOnEnter = function (e) { if (e.key === "Enter") sendMsg(); };
-
-  window.handleFile = function (inp) {
-    const f = inp.files[0]; if (!f) return;
-    if (f.size > 2 * 1024 * 1024) { showToast("Max image size: 2MB"); return; }
-    const r = new FileReader();
-    r.onload = e => {
-      wsSend({ type: "chat", sender: myUsername, message: "", image: e.target.result });
-      appendChatMsg(myUsername, "", e.target.result);
-    };
-    r.readAsDataURL(f);
-    inp.value = "";
-  };
-
-  // ── Lobby ──────────────────────────────────────────────────
-  function handleLobbyUpdate(msg) {
-    lobbyPlayers = msg.players || {};
-    iAmHost      = msg.host === myUsername;
-    isSpectator  = msg.game_active && !(myUsername in lobbyPlayers);
-
-    renderLobby();
-
-    if (isSpectator) {
-      showToast("You joined as spectator — play next round!");
-    }
-  }
-
-  function renderLobby() {
-    const listEl = document.getElementById("lobby-player-list");
-    if (!listEl) return;
-    listEl.innerHTML = "";
-
-    for (const [username, info] of Object.entries(lobbyPlayers)) {
-      const row = document.createElement("div");
-      row.className = "player-row" + (username === myUsername ? " is-you" : "");
-
-      const dot = document.createElement("div");
-      dot.className = "player-dot";
-      dot.style.background = colorToCSS(info.color) || "#666";
-
-      const name = document.createElement("span");
-      name.className = "player-name";
-      name.textContent = username + (username === myUsername ? " (you)" : "");
-
-      const badges = document.createElement("div");
-      badges.style.cssText = "display:flex;gap:5px;align-items:center;";
-
-      if (username === myUsername && iAmHost) {
-        const hb = document.createElement("span");
-        hb.className = "player-host-badge"; hb.textContent = "HOST";
-        badges.appendChild(hb);
-      }
-
-      const rb = document.createElement("span");
-      rb.className = "player-ready-badge " + (info.ready ? "ready" : "not-ready");
-      rb.textContent = info.ready ? "✓ Ready" : "Not ready";
-      badges.appendChild(rb);
-
-      row.appendChild(dot); row.appendChild(name); row.appendChild(badges);
-      listEl.appendChild(row);
-    }
-
-    // Show/hide start button (host only, 1+ ready)
-    const startBtn = document.getElementById("start-game-btn");
-    if (startBtn) {
-      const readyCount = Object.values(lobbyPlayers).filter(p => p.ready).length;
-      startBtn.disabled = !(iAmHost && readyCount >= 1);
-      startBtn.style.display = iAmHost ? "block" : "none";
-    }
-
-    // Show game view if game active
-    const gameActive = Object.values(lobbyPlayers).some(p => p.color);
-    if (!gameActive) showLobby();
-  }
-
-  window.toggleReady = function () {
-    const isReady = lobbyPlayers[myUsername]?.ready;
-    wsSend({ type: "ready", ready: !isReady });
-  };
-
-  window.startGame = function () {
-    if (!iAmHost) return;
-    wsSend({ type: "start_game", game_type: selectedGameType });
-  };
-
-  window.selectGameType = function (type) {
-    selectedGameType = type;
-    document.querySelectorAll(".game-type-btn").forEach(b => {
-      b.classList.toggle("selected", b.dataset.type === type);
+    document.querySelectorAll('.tab-btn').forEach((b, i) => {
+        b.classList.toggle('active', ['ludo', 'chess'][i] === tab);
     });
-  };
 
-  // ── Game Start ─────────────────────────────────────────────
-  function handleGameStart(msg) {
-    gameStarted = true;
-    activeGame  = msg.game_type;
-    myColor     = msg.assignments?.[myUsername] || "";
-    isSpectator = !(myUsername in (msg.assignments || {}));
+    document.getElementById('pane-ludo').classList.toggle('vis', tab === 'ludo');
+    document.getElementById('pane-chess').classList.toggle('vis', tab === 'chess');
 
-    appendSystemMsg(msg.message);
-    appendGameEvent(`${msg.game_type.toUpperCase()} game started! Good luck!`);
-
-    showGame(activeGame);
-
-    if (activeGame === "ludo") {
-      startLudoGame(msg);
-    } else {
-      startChessGame(msg);
+    // On mobile, entering a game tab also activates game fullscreen mode
+    if (window.innerWidth < 800 && myUsername) {
+        enterGameMode();
     }
-  }
+}
 
-  function handleGameSync(msg) {
-    // Another client broadcasted game state — sync our board
-    if (msg.sender === myUsername) return; // our own state, skip
-    if (msg.game_type === "ludo" && window.LudoGame) {
-      LudoGame.syncState(msg.payload);
+// ── Game Fullscreen Mode (mobile) ──
+function enterGameMode() {
+    gameMode = true;
+    const gameArea = document.getElementById('game-area');
+    const chatPanel = document.querySelector('.chat-panel');
+
+    gameArea.classList.add('active');
+    if (chatPanel) chatPanel.style.display = 'none';
+}
+
+function exitGameMode() {
+    gameMode = false;
+    const gameArea = document.getElementById('game-area');
+    const chatPanel = document.querySelector('.chat-panel');
+
+    if (window.innerWidth < 800) {
+        gameArea.classList.remove('active');
+        if (chatPanel) chatPanel.style.display = 'flex';
     }
-    // Chess AI is local, no sync needed for chess unless multiplayer
-  }
+}
 
-  // ── Game Initialization ─────────────────────────────────────
-  function startLudoGame(msg) {
-    const assignments = msg.assignments || {};
-    const names  = { red: null, green: "Groq-AI", blue: "Router-AI" };
-    const humans = { red: false, green: false, blue: false };
-
-    for (const [username, color] of Object.entries(assignments)) {
-      if (color in names) {
-        names[color]  = username;
-        humans[color] = true;
-      }
+// ── Handle resize: if going desktop, cleanup mobile mode ──
+window.addEventListener('resize', () => {
+    if (window.innerWidth >= 800) {
+        const gameArea = document.getElementById('game-area');
+        const chatPanel = document.querySelector('.chat-panel');
+        gameArea.classList.remove('active');
+        if (chatPanel) chatPanel.style.display = 'flex';
+        gameMode = false;
     }
-    // Red is always the local player if they have a slot
-    if (!names.red) names.red = "You";
-
-    LudoGame.init({
-      names, humans,
-      callbacks: {
-        onSpecialEvent: (eventType, detail, summary) => {
-          appendGameEvent(detail);
-          broadcastGameEvent("ludo", eventType, detail, summary, LudoGame.getState());
-        },
-        onMove: (eventType, detail, summary, state) => {
-          broadcastGameState("ludo", eventType, detail, summary, state);
-        },
-        onGameEnd: (winnerColor, winnerName) => {
-          appendGameEvent(`🏆 ${winnerName} WINS the Ludo game!`);
-        },
-        onLog: (msg) => {
-          const el = document.getElementById("game-log");
-          if (el) { el.innerHTML += msg + "<br>"; el.scrollTop = el.scrollHeight; }
-        },
-      },
-    });
-  }
-
-  function startChessGame(msg) {
-    const assignments = msg.assignments || {};
-    const names  = { w: myUsername || "You", b: "Groq-AI" };
-    const humans = { w: true, b: false };
-
-    // Check if black slot is taken by a human
-    for (const [username, color] of Object.entries(assignments)) {
-      if (color === "black") { names.b = username; humans.b = true; }
-      if (color === "white") { names.w = username; }
-    }
-
-    ChessGame.init({
-      names, humans,
-      callbacks: {
-        onSpecialEvent: (eventType, detail) => {
-          appendGameEvent(detail);
-          broadcastGameEvent("chess", eventType, detail, "", ChessGame.getState());
-        },
-        onMove: (eventType, detail, state) => {
-          broadcastGameState("chess", eventType, detail, "", state);
-        },
-        onGameEnd: (winner, name) => {
-          appendGameEvent(`🏆 ${name} WINS the Chess game!`);
-        },
-      },
-    });
-  }
-
-  // ── Game Broadcasting ──────────────────────────────────────
-  const SPECIAL_EVENTS = new Set([
-    "capture","dice_six","token_enter","home_stretch",
-    "near_win","win","comeback",
-    "check","checkmate","stalemate","queen_capture",
-    "promotion","castling","rook_capture",
-  ]);
-
-  function broadcastGameState(gameType, eventType, detail, summary, state) {
-    const isSpecial = SPECIAL_EVENTS.has(eventType);
-    const payload = {
-      event:      detail,
-      event_type: eventType,
-      is_special: isSpecial,
-      summary:    summary,
-      ...(state || {}),
-    };
-    wsSend({
-      type:    "game_update",
-      message: `__${gameType.toUpperCase()}__:${JSON.stringify(payload)}`,
-      sender:  myUsername,
-    });
-  }
-
-  function broadcastGameEvent(gameType, eventType, detail, summary, state) {
-    broadcastGameState(gameType, eventType, detail, summary, state);
-  }
-
-  // ── Vote System ────────────────────────────────────────────
-  function handleVoteRequest(msg) {
-    const requester = msg.requester;
-    if (!(myUsername in lobbyPlayers)) return; // spectators don't vote
-
-    pendingVote = { requester };
-
-    // Show vote banner
-    const banner = dom.voteBanner;
-    if (!banner) return;
-    banner.querySelector(".vote-msg").textContent = msg.message || `${requester} wants to join!`;
-    banner.style.display = "flex";
-
-    // Auto-resolve after timeout (UI side)
-    pendingVote.timer = setTimeout(() => hideBanner(), (msg.timeout || 20) * 1000 + 1000);
-  }
-
-  window.castVote = function (accepted) {
-    if (!pendingVote) return;
-    wsSend({ type: "vote", vote: accepted });
-    hideBanner();
-  };
-
-  function hideBanner() {
-    const b = dom.voteBanner;
-    if (b) b.style.display = "none";
-  }
-
-  // ── View Switching ──────────────────────────────────────────
-  function showLobby() {
-    if (dom.lobbyView)  dom.lobbyView.style.display  = "flex";
-    if (dom.gameView)   dom.gameView.style.display    = "none";
-  }
-
-  function showGame(type) {
-    if (dom.lobbyView) dom.lobbyView.style.display  = "none";
-    if (dom.gameView)  dom.gameView.style.display   = "flex";
-
-    // Tab switch to correct game
-    switchTab(type);
-  }
-
-  window.switchTab = function (name) {
-    activeGame = name;
-    document.querySelectorAll(".tab-btn").forEach(b => {
-      b.classList.toggle("active", b.dataset.tab === name);
-    });
-    if (dom.ludoPane)  dom.ludoPane.classList.toggle("hidden",  name !== "ludo");
-    if (dom.chessPane) dom.chessPane.classList.toggle("hidden", name !== "chess");
-  };
-
-  window.newGame = function (type) {
-    if (type === "ludo") {
-      LudoGame.reset();
-      broadcastGameEvent("ludo", "game_reset", "New Ludo game started!", "", LudoGame.getState());
-    } else {
-      ChessGame.reset();
-      broadcastGameEvent("chess", "game_reset", "New Chess game started!", "", ChessGame.getState());
-    }
-  };
-
-  // ── Utility ────────────────────────────────────────────────
-  function colorToCSS(color) {
-    const map = { red:"#ff5577", green:"#44dd88", blue:"#4488ff",
-                  yellow:"#ffcc44", white:"#eee", black:"#555" };
-    return map[color] || "#888";
-  }
-
-  window.showToast = function (msg, duration = 3000) {
-    const t = document.createElement("div");
-    t.className = "toast"; t.textContent = msg;
-    document.body.appendChild(t);
-    setTimeout(() => t.remove(), duration);
-  };
-
-  // Initialize chat overlay as collapsed on mobile
-  window.addEventListener("load", () => {
-    if (dom.chatOverlay) {
-      dom.chatOverlay.classList.add("collapsed");
-    }
-  });
-
-})();
+});

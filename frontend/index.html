@@ -4,147 +4,97 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="theme-color" content="#0b0b14">
-    <title>Squad.GG</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <title>AI Squad – Chat + Games</title>
+    <meta name="description" content="AI Squad - Chat with AI bros and play Ludo & Chess together in real-time">
+    <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="css/style.css">
 </head>
 
 <body>
+    <div class="app-shell">
 
-    <!-- ══════════════════════════════════════════
-     SETUP SCREEN
-     ══════════════════════════════════════════ -->
-    <div id="setup-screen">
-        <h1>SQUAD.GG</h1>
-        <p>Chat + Games + AI</p>
-        <input class="setup-field" id="inp-user" placeholder="Your username" autocomplete="off" spellcheck="false">
-        <input class="setup-field" id="inp-room" placeholder="Room ID (e.g. 101)" autocomplete="off" spellcheck="false">
-        <button class="btn-join" onclick="joinRoom()">Enter Room →</button>
-    </div>
-
-    <!-- ══════════════════════════════════════════
-     APP SHELL (visible after join)
-     ══════════════════════════════════════════ -->
-    <div id="app">
-
-        <!-- ── Top bar ── -->
+        <!-- TOP BAR -->
         <div class="top-bar">
-            <span class="logo">⚡ SQUAD</span>
-            <div class="room-pill" id="room-badge">Not connected</div>
-            <div class="spacer"></div>
-            <!-- Game tabs -->
-            <button class="tab-btn active" id="tab-ludo" data-tab="ludo" onclick="switchTab('ludo')">🎲 Ludo</button>
-            <button class="tab-btn" id="tab-chess" data-tab="chess" onclick="switchTab('chess')">♟ Chess</button>
-            <!-- Chat toggle (mobile only) -->
-            <div class="chat-toggle-btn" id="chat-toggle-btn" onclick="toggleChat()" title="Chat">
-                💬
-                <div class="chat-badge" id="chat-badge">0</div>
+            <h1>⚡ SQUAD.GG</h1>
+            <div class="room-badge" id="room-badge">Not connected</div>
+            <div class="tab-bar">
+                <button class="tab-btn active" onclick="switchTab('ludo')">🎲 Ludo</button>
+                <button class="tab-btn" onclick="switchTab('chess')">♟ Chess</button>
             </div>
         </div>
 
-        <!-- ── Content area ── -->
-        <div class="content-area">
+        <!-- MAIN CONTENT -->
+        <div class="main-content">
 
-            <!-- ── CHAT OVERLAY ── -->
-            <div class="chat-overlay collapsed" id="chat-overlay">
-                <button class="chat-close-btn" onclick="toggleChat()">✕ Close chat</button>
-                <div class="chat-messages-float" id="chat-messages"></div>
-                <div class="chat-input-bar">
-                    <input type="file" id="file-inp" accept="image/*" style="display:none" onchange="handleFile(this)">
-                    <div class="btn-file-img" onclick="document.getElementById('file-inp').click()" title="Image">📷
+            <!-- CHAT PANEL -->
+            <div class="chat-panel">
+                <div class="setup-screen" id="setup-screen">
+                    <h2>Join Squad</h2>
+                    <input class="setup-input" id="inp-user" placeholder="Your username">
+                    <input class="setup-input" id="inp-room" placeholder="Room ID (e.g. 101)">
+                    <button class="btn-primary" onclick="joinChat()">Enter Room →</button>
+                </div>
+                <div id="chat-live" style="display:none;flex-direction:column;flex:1;min-height:0;">
+                    <div class="chat-msgs" id="chat-msgs"></div>
+                    <div class="chat-inp-area">
+                        <input type="file" id="file-inp" accept="image/*" style="display:none"
+                            onchange="handleFile(this)">
+                        <div class="bico" onclick="document.getElementById('file-inp').click()" title="Image">📷</div>
+                        <input type="text" id="chat-inp" placeholder="Type something…"
+                            onkeypress="if(event.key==='Enter')sendMsg()">
+                        <button class="bsend" onclick="sendMsg()">Send</button>
                     </div>
-                    <input type="text" id="chat-inp" placeholder="Type something…" onkeypress="sendMsgOnEnter(event)"
-                        autocomplete="off">
-                    <button class="chat-send-btn" onclick="sendMsg()">Send</button>
                 </div>
             </div>
 
-            <!-- ── GAME VIEW ── -->
-            <div class="game-view" id="game-view" style="display:none;">
+            <!-- GAME AREA -->
+            <div class="game-area" id="game-area">
 
-                <!-- LOBBY -->
-                <div class="lobby-view" id="lobby-view" style="display:flex;">
-                    <div class="lobby-card">
-                        <h2>🏠 ROOM LOBBY</h2>
-                        <!-- Player list -->
-                        <div id="lobby-player-list"></div>
-
-                        <!-- Game type selector -->
-                        <div>
-                            <div style="font-size:.78em;color:var(--text2);margin-bottom:6px;">Choose game:</div>
-                            <div class="game-type-selector">
-                                <div class="game-type-btn selected" data-type="ludo" onclick="selectGameType('ludo')">🎲
-                                    Ludo</div>
-                                <div class="game-type-btn" data-type="chess" onclick="selectGameType('chess')">♟ Chess
+                <!-- LUDO PANE -->
+                <div class="gpane vis" id="pane-ludo">
+                    <div class="pane-hdr">
+                        <button class="btn-back" onclick="exitGameMode()">← Back</button>
+                        <h2>🎲 Ludo — You vs AI Squad</h2>
+                        <button class="bnew" onclick="ludoReset()">New Game</button>
+                    </div>
+                    <div class="gpane-inner">
+                        <div class="lctrl">
+                            <div class="dice-wrap">
+                                <div class="dice doff" id="ldice" onclick="ludoRoll()">🎲</div>
+                                <div>
+                                    <div style="font-size:.75em;color:var(--text2);margin-bottom:3px;">Players</div>
+                                    <div class="tdots" id="tdots"></div>
                                 </div>
                             </div>
+                            <div class="lstat" id="lstat">Join a room to play</div>
                         </div>
-
-                        <!-- Actions -->
-                        <div class="lobby-actions">
-                            <button class="btn-lobby" id="ready-btn" onclick="toggleReady()">✓ Ready</button>
-                            <button class="btn-lobby primary" id="start-game-btn" onclick="startGame()" disabled
-                                style="display:none;">
-                                ▶ Start Game
-                            </button>
+                        <div style="position:relative;">
+                            <div id="ludo-board"></div>
+                            <div class="winner-ov" id="ludo-winner">
+                                <div class="wemoji" id="wemoji">🏆</div>
+                                <div class="wtext" id="wtext">WINNER!</div>
+                                <button class="btn-primary" onclick="ludoReset()" style="margin-top:8px;">Play Again
+                                </button>
+                            </div>
                         </div>
-
-                        <div style="font-size:.72em;color:var(--text2);text-align:center;line-height:1.6;">
-                            Mark yourself ready, then the host starts.<br>
-                            AI players fill empty slots automatically.
-                        </div>
+                        <div class="llog" id="llog">Join a room to start playing…</div>
                     </div>
                 </div>
 
-                <!-- ──────────── LUDO PANE ──────────── -->
-                <div id="pane-ludo" style="width:100%;display:flex;flex-direction:column;align-items:center;gap:10px;">
-
-                    <!-- Controls bar -->
-                    <div class="game-controls">
-                        <div class="dice doff" id="ludo-dice" onclick="LudoGame.rollDice()">🎲</div>
-                        <div>
-                            <div style="font-size:.72em;color:var(--text2);margin-bottom:3px;">Players</div>
-                            <div class="turn-dots" id="turn-dots"></div>
-                        </div>
-                        <div class="game-status-txt" id="game-status">Waiting to start…</div>
-                        <button class="btn-game-sm" onclick="newGame('ludo')">↺ New</button>
+                <!-- CHESS PANE -->
+                <div class="gpane" id="pane-chess">
+                    <div class="pane-hdr">
+                        <button class="btn-back" onclick="exitGameMode()">← Back</button>
+                        <h2>♟ Chess — You (White) vs Groq-AI (Black)</h2>
+                        <button class="bnew" onclick="chessReset()">New Game</button>
                     </div>
-
-                    <!-- Board wrapper (holds the board + winner overlay) -->
-                    <div style="position:relative;" id="ludo-board-wrap">
-                        <div id="ludo-board"></div>
-                        <!-- Winner overlay -->
-                        <div class="winner-ov" id="ludo-winner">
-                            <div class="w-emoji" id="ludo-winner-emoji">🏆</div>
-                            <div class="w-text" id="ludo-winner-text">WINNER!</div>
-                            <button class="btn-join" onclick="newGame('ludo')"
-                                style="margin-top:12px;width:auto;padding:10px 24px;">
-                                Play Again
-                            </button>
-                        </div>
-                    </div>
-
-                    <!-- Game log -->
-                    <div class="game-log" id="game-log">Game events will appear here…</div>
-                </div>
-
-                <!-- ──────────── CHESS PANE ──────────── -->
-                <div id="pane-chess" class="hidden" style="width:100%;display:flex;justify-content:center;">
-                    <div class="chess-layout">
-
-                        <!-- Board + coords -->
-                        <div class="chess-board-wrap">
-                            <div class="chess-coord-files" id="c-files"></div>
-                            <div class="chess-rank-row">
-                                <div class="chess-coord-ranks" id="c-ranks"></div>
+                    <div class="chess-wrap">
+                        <div class="chess-board-outer">
+                            <div class="chess-file-labels" id="cfiles"></div>
+                            <div class="chess-ranks-row">
+                                <div class="chess-rank-labels" id="cranks"></div>
                                 <div style="position:relative;">
                                     <div id="chess-board"></div>
-                                    <!-- Promotion modal -->
                                     <div class="promo-modal" id="promo-modal">
                                         <div class="promo-title">Promote pawn to:</div>
                                         <div class="promo-pieces" id="promo-pieces"></div>
@@ -152,89 +102,60 @@
                                 </div>
                             </div>
                         </div>
-
-                        <!-- Side panel -->
                         <div class="chess-side">
-                            <div class="c-box">
+                            <div class="cbox">
                                 <h3>PLAYERS</h3>
-                                <div class="p-slot active" id="chess-slot-w">
-                                    <div class="p-dot" style="background:#ddd;border:1px solid #666;"></div>
-                                    <div class="p-name" id="cname-w">You (White)</div>
+                                <div class="pslot aturn" id="cslot-w">
+                                    <div class="pdot" style="background:#eee;border:1px solid #666;"></div>
+                                    <div class="pname" id="cname-w">You (White)</div>
+                                    <div class="pstat" id="cstatw">●</div>
                                 </div>
-                                <div class="p-slot" id="chess-slot-b">
-                                    <div class="p-dot" style="background:#444;border:1px solid #888;"></div>
-                                    <div class="p-name">Groq-AI (Black)</div>
+                                <div class="pslot" id="cslot-b">
+                                    <div class="pdot" style="background:#555;border:1px solid #999;"></div>
+                                    <div class="pname">Groq-AI (Black)</div>
+                                    <div class="pstat" id="cstatb">●</div>
                                 </div>
                             </div>
-                            <div class="c-box">
+                            <div class="cbox">
                                 <h3>STATUS</h3>
-                                <div class="c-status" id="c-status">Waiting to start…</div>
+                                <div class="cstatus" id="cstatus">Join a room to play</div>
                             </div>
-                            <div class="c-box">
+                            <div class="cbox">
                                 <h3>CAPTURED</h3>
                                 <div style="font-size:.7em;color:var(--text2);margin-bottom:3px;">White took:</div>
-                                <div class="c-cap" id="cap-w"></div>
+                                <div class="ccap" id="cap-w"></div>
                                 <div style="font-size:.7em;color:var(--text2);margin:5px 0 3px;">Black took:</div>
-                                <div class="c-cap" id="cap-b"></div>
+                                <div class="ccap" id="cap-b"></div>
                             </div>
-                            <div class="c-box">
+                            <div class="cbox">
                                 <h3>MOVES</h3>
-                                <div class="c-log" id="c-log"></div>
+                                <div class="clog" id="clog"></div>
                             </div>
-                            <button class="btn-undo" onclick="ChessGame.undo()">↩ Undo move</button>
-                            <button class="btn-game-sm" onclick="newGame('chess')" style="width:100%;margin-top:4px;">↺
-                                New Game</button>
+                            <button class="bact" onclick="chessUndo()">↩ Undo last move</button>
                         </div>
                     </div>
                 </div>
 
-            </div><!-- /game-view -->
-        </div><!-- /content-area -->
-    </div><!-- /app -->
+                <!-- LIVE CHAT OVERLAY (for game mode) -->
+                <div class="live-chat-overlay" id="live-chat-overlay">
+                    <div class="live-chat-msgs" id="live-chat-msgs"></div>
+                    <div class="live-chat-input">
+                        <input type="text" id="live-chat-inp" placeholder="Chat…"
+                            onkeypress="if(event.key==='Enter')sendLiveMsg()">
+                        <button onclick="sendLiveMsg()">Send</button>
+                    </div>
+                </div>
 
-    <!-- ── Vote banner ── -->
-    <div id="vote-banner" class="vote-banner" style="display:none;">
-        <p class="vote-msg">Someone wants to join!</p>
-        <div class="vote-btns">
-            <button class="btn-accept" onclick="castVote(true)">✓ Accept</button>
-            <button class="btn-decline" onclick="castVote(false)">✕ Decline</button>
+            </div>
+
         </div>
+
     </div>
 
-    <!-- ══════════════════════════════════════════
-     SCRIPTS (load order matters)
-     ══════════════════════════════════════════ -->
+    <!-- Scripts: app core first, then game engines -->
+    <script src="js/app.js"></script>
     <script src="games/ludo.js"></script>
     <script src="games/chess.js"></script>
-    <script src="js/app.js"></script>
-
-    <script>
-        // ── Build chess board coordinate labels on load ──
-        window.addEventListener("load", function () {
-            const cfiles = document.getElementById("c-files");
-            const cranks = document.getElementById("c-ranks");
-            if (cfiles) {
-                "abcdefgh".split("").forEach(f => {
-                    const s = document.createElement("span"); s.textContent = f; cfiles.appendChild(s);
-                });
-            }
-            if (cranks) {
-                for (let r = 0; r < 8; r++) {
-                    const s = document.createElement("span"); s.textContent = 8 - r; cranks.appendChild(s);
-                }
-            }
-
-            // Build ludo board (visual only, no game state yet)
-            if (window.LudoGame) {
-                // Build board structure without starting game
-                const bd = document.getElementById("ludo-board");
-                if (bd && bd.children.length === 0) {
-                    // Call internal board build by triggering a silent init
-                    // The board will be properly built when init() is called
-                }
-            }
-        });
-    </script>
 </body>
 
 </html>

@@ -1,541 +1,573 @@
-/**
- * Squad.GG – Chess Game Engine
- * Exposed as window.ChessGame
- *
- * Features:
- *  - Complete chess rules: all piece moves, castling, en passant, promotion
- *  - Check, checkmate, stalemate detection
- *  - Minimax depth-2 with alpha-beta pruning + piece-square tables
- *  - Special event detection (check, capture queen, promotion, castling, etc.)
- *  - Viewport-responsive board rendering
- *  - Undo support (replays from history)
- */
+// ═══════════════════════════════════════════
+// CHESS ENGINE – Full rules, minimax depth-2, rendering
+// ═══════════════════════════════════════════
 
-(function (global) {
-  "use strict";
+const UNIC = {
+    wk: '♔', wq: '♕', wr: '♖', wb: '♗', wn: '♘', wp: '♙',
+    bk: '♚', bq: '♛', br: '♜', bb: '♝', bn: '♞', bp: '♟'
+};
 
-  // ── Unicode pieces ──────────────────────────────────────────
-  const U = {
-    wk:"♔",wq:"♕",wr:"♖",wb:"♗",wn:"♘",wp:"♙",
-    bk:"♚",bq:"♛",br:"♜",bb:"♝",bn:"♞",bp:"♟",
-  };
+let chess = {};
+let cAiRunning = false;
 
-  // ── Piece values + piece-square tables ──────────────────────
-  const PV = { p:100, n:320, b:330, r:500, q:900, k:20000 };
-  const PST = {
-    p: [[0,0,0,0,0,0,0,0],[50,50,50,50,50,50,50,50],[10,10,20,30,30,20,10,10],[5,5,10,25,25,10,5,5],[0,0,0,20,20,0,0,0],[5,-5,-10,0,0,-10,-5,5],[5,10,10,-20,-20,10,10,5],[0,0,0,0,0,0,0,0]],
-    n: [[-50,-40,-30,-30,-30,-30,-40,-50],[-40,-20,0,0,0,0,-20,-40],[-30,0,10,15,15,10,0,-30],[-30,5,15,20,20,15,5,-30],[-30,0,15,20,20,15,0,-30],[-30,5,10,15,15,10,5,-30],[-40,-20,0,5,5,0,-20,-40],[-50,-40,-30,-30,-30,-30,-40,-50]],
-    b: [[-20,-10,-10,-10,-10,-10,-10,-20],[-10,0,0,0,0,0,0,-10],[-10,0,5,10,10,5,0,-10],[-10,5,5,10,10,5,5,-10],[-10,0,10,10,10,10,0,-10],[-10,10,10,10,10,10,10,-10],[-10,5,0,0,0,0,5,-10],[-20,-10,-10,-10,-10,-10,-10,-20]],
-    r: [[0,0,0,0,0,0,0,0],[5,10,10,10,10,10,10,5],[-5,0,0,0,0,0,0,-5],[-5,0,0,0,0,0,0,-5],[-5,0,0,0,0,0,0,-5],[-5,0,0,0,0,0,0,-5],[-5,0,0,0,0,0,0,-5],[0,0,0,5,5,0,0,0]],
-    q: [[-20,-10,-10,-5,-5,-10,-10,-20],[-10,0,0,0,0,0,0,-10],[-10,0,5,5,5,5,0,-10],[-5,0,5,5,5,5,0,-5],[0,0,5,5,5,5,0,-5],[-10,5,5,5,5,5,0,-10],[-10,0,5,0,0,0,0,-10],[-20,-10,-10,-5,-5,-10,-10,-20]],
-    k: [[-30,-40,-40,-50,-50,-40,-40,-30],[-30,-40,-40,-50,-50,-40,-40,-30],[-30,-40,-40,-50,-50,-40,-40,-30],[-30,-40,-40,-50,-50,-40,-40,-30],[-20,-30,-30,-40,-40,-30,-30,-20],[-10,-20,-20,-20,-20,-20,-20,-10],[20,20,0,0,0,0,20,20],[20,30,10,0,0,10,30,20]],
-  };
-
-  // ── State ───────────────────────────────────────────────────
-  let g = {};  // game state (rebuilt by initState)
-  let aiRunning = false;
-
-  let callbacks = {
-    onSpecialEvent: null,
-    onMove:         null,
-    onGameEnd:      null,
-    onLog:          null,
-  };
-
-  let playerNames = { w: "You", b: "Groq-AI" };
-  let humanColors = { w: true, b: false };  // w=human, b=AI by default
-
-  function initState() {
-    const board = Array.from({length:8}, () => Array(8).fill(null));
-    const back = ["r","n","b","q","k","b","n","r"];
+function chessInitState() {
+    const b = Array.from({ length: 8 }, () => Array(8).fill(null));
+    const back = ['r', 'n', 'b', 'q', 'k', 'b', 'n', 'r'];
     for (let f = 0; f < 8; f++) {
-      board[0][f] = { type: back[f], color: "b" };
-      board[1][f] = { type: "p",    color: "b" };
-      board[6][f] = { type: "p",    color: "w" };
-      board[7][f] = { type: back[f], color: "w" };
+        b[0][f] = { type: back[f], color: 'b' };
+        b[1][f] = { type: 'p', color: 'b' };
+        b[6][f] = { type: 'p', color: 'w' };
+        b[7][f] = { type: back[f], color: 'w' };
     }
     return {
-      board,
-      turn:     "w",
-      sel:      null,   // [r,f]
-      legal:    [],     // [[r,f]…]
-      hist:     [],     // move history
-      castling: { wk:true, wq:true, bk:true, bq:true },
-      ep:       null,   // en-passant square [r,f]
-      capW:     [],     // piece types captured by white
-      capB:     [],     // piece types captured by black
-      inCheck:  false,
-      mate:     false,
-      stale:    false,
-      started:  false,
-      promo:    null,   // pending promotion {fr,ff,tr,tf,color,san}
+        board: b, turn: 'w', sel: null, legal: [], hist: [],
+        castling: { wk: true, wq: true, bk: true, bq: true },
+        ep: null, capW: [], capB: [], inCheck: false,
+        mate: false, stale: false, started: false, promo: null
     };
-  }
+}
 
-  // ── Public API ──────────────────────────────────────────────
-  const ChessGame = {
+function chessInit() {
+    chess = chessInitState();
+    chess.started = true;
+    cRender();
+    cUpdateSide();
+    cSetStat('Your turn (White)');
+    document.getElementById('clog').innerHTML = '';
+    document.getElementById('cap-w').innerHTML = '';
+    document.getElementById('cap-b').innerHTML = '';
+}
 
-    init(config = {}) {
-      if (config.names)  Object.assign(playerNames, config.names);
-      if (config.humans) Object.assign(humanColors, config.humans);
-      if (config.callbacks) Object.assign(callbacks, config.callbacks);
-      document.getElementById("cname-w").textContent = playerNames.w + " (White)";
-      this.reset();
-    },
+// ── Rendering ──
+function cRender() {
+    const bd = document.getElementById('chess-board');
+    bd.innerHTML = '';
+    for (let r = 0; r < 8; r++) {
+        for (let f = 0; f < 8; f++) {
+            const cell = document.createElement('div');
+            cell.className = 'cc ' + ((r + f) % 2 === 0 ? 'lt' : 'dk');
+            cell.dataset.r = r;
+            cell.dataset.f = f;
 
-    reset() {
-      aiRunning = false;
-      g = initState();
-      g.started = true;
-      renderBoard();
-      updateSide();
-      setStatus("Your turn (White)");
-      document.getElementById("c-log").innerHTML = "";
-      document.getElementById("cap-w").textContent = "";
-      document.getElementById("cap-b").textContent = "";
-    },
+            const p = chess.board[r][f];
+            if (p) cell.textContent = UNIC[p.color + p.type];
 
-    /** Called when user clicks a board cell. */
-    handleClick(r, f) {
-      if (!g.started || g.turn !== "w" || !humanColors.w) return;
-      if (g.mate || g.stale || aiRunning || g.promo) return;
+            if (chess.sel && chess.sel[0] === r && chess.sel[1] === f) cell.classList.add('sel');
 
-      const piece = g.board[r][f];
+            const isL = chess.legal.some(m => m[0] === r && m[1] === f);
+            if (isL) {
+                if (p && p.color !== chess.turn) cell.classList.add('lc2');
+                else cell.classList.add('lm');
+            }
 
-      if (g.sel) {
-        const [sr, sf] = g.sel;
-        if (g.legal.some(m => m[0]===r && m[1]===f)) {
-          execMove(sr, sf, r, f, "w");
-          return;
+            if (chess.inCheck && p && p.type === 'k' && p.color === chess.turn) cell.classList.add('chk');
+
+            cell.addEventListener('click', () => cClick(r, f));
+            bd.appendChild(cell);
         }
-        g.sel = null; g.legal = [];
-        if (piece && piece.color === "w") {
-          g.sel = [r,f]; g.legal = getLegal(r, f, "w");
+    }
+}
+
+function cUpdateSide() {
+    document.getElementById('cslot-w').classList.toggle('aturn', chess.turn === 'w' && !chess.mate && !chess.stale);
+    document.getElementById('cslot-b').classList.toggle('aturn', chess.turn === 'b' && !chess.mate && !chess.stale);
+    document.getElementById('cap-w').textContent = chess.capW.map(p => UNIC['b' + p]).join('');
+    document.getElementById('cap-b').textContent = chess.capB.map(p => UNIC['w' + p]).join('');
+}
+
+function cSetStat(msg) { document.getElementById('cstatus').textContent = msg; }
+
+function cAddLog(san, color) {
+    const log = document.getElementById('clog');
+    const mn = Math.ceil(chess.hist.length / 2);
+    if (color === 'w') {
+        const row = document.createElement('div');
+        row.className = 'cmove-row';
+        row.innerHTML = `<span class="cmnum">${mn}.</span><span class="cmw">${san}</span><span class="cmb" id="clb${mn}"></span>`;
+        log.appendChild(row);
+    } else {
+        const sp = document.getElementById(`clb${mn}`);
+        if (sp) sp.textContent = san;
+        else {
+            const row = document.createElement('div');
+            row.className = 'cmove-row';
+            row.innerHTML = `<span class="cmnum">${mn}.</span><span class="cmw">…</span><span class="cmb">${san}</span>`;
+            log.appendChild(row);
         }
-      } else {
-        if (piece && piece.color === "w") {
-          g.sel = [r,f]; g.legal = getLegal(r, f, "w");
+    }
+    log.scrollTop = log.scrollHeight;
+}
+
+// ── Click handler ──
+function cClick(r, f) {
+    if (!chess.started || chess.turn !== 'w' || chess.mate || chess.stale || cAiRunning || chess.promo) return;
+
+    const p = chess.board[r][f];
+    if (chess.sel) {
+        const [sr, sf] = chess.sel;
+        if (chess.legal.some(m => m[0] === r && m[1] === f)) {
+            cExec(sr, sf, r, f, 'w');
+            return;
         }
-      }
-      renderBoard();
-    },
+        chess.sel = null;
+        chess.legal = [];
+        if (p && p.color === 'w') {
+            chess.sel = [r, f];
+            chess.legal = cGetLegal(r, f, 'w');
+        }
+    } else {
+        if (p && p.color === 'w') {
+            chess.sel = [r, f];
+            chess.legal = cGetLegal(r, f, 'w');
+        }
+    }
+    cRender();
+}
 
-    /** Called from promo modal. */
-    promote(type) {
-      if (!g.promo) return;
-      const { fr, ff, tr, tf, color, san } = g.promo;
-      g.board[tr][tf] = { type, color };
-      g.promo = null;
-      document.getElementById("promo-modal").classList.remove("show");
-      fireSpecial("promotion", `Pawn promoted to ${type.toUpperCase()}!`);
-      finishMove(fr, ff, tr, tf, color, san + "=" + type.toUpperCase());
-    },
+// ── Execute move ──
+function cExec(fr, ff, tr, tf, color, silent) {
+    const piece = chess.board[fr][ff];
+    const target = chess.board[tr][tf];
+    const san = cSAN(fr, ff, tr, tf, piece, target, color);
 
-    undo() {
-      if (g.hist.length < 2 || aiRunning) return;
-      const moves = g.hist.slice(0, -2);
-      ChessGame.reset();
-      document.getElementById("c-log").innerHTML = "";
-      for (const m of moves) {
-        execMoveSilent(m.fr, m.ff, m.tr, m.tf, m.color, m.promoType);
-        addLog(m.san, m.color);
-      }
-      renderBoard(); updateSide(); setStatus("Your turn (White)");
-    },
-
-    getState() {
-      const last = g.hist[g.hist.length - 1];
-      return {
-        turn:    g.turn,
-        inCheck: g.inCheck,
-        mate:    g.mate,
-        stale:   g.stale,
-        capW:    [...g.capW],
-        capB:    [...g.capB],
-        lastMove: last ? last.san : "",
-        moveCount: g.hist.length,
-      };
-    },
-  };
-
-  // ── Move Execution ──────────────────────────────────────────
-
-  function execMove(fr, ff, tr, tf, color) {
-    const piece  = g.board[fr][ff];
-    const target = g.board[tr][tf];
-    const san    = makeSAN(fr, ff, tr, tf, piece, target, color);
-
-    // Capture
     if (target) {
-      color === "w" ? g.capW.push(target.type) : g.capB.push(target.type);
-      if (target.type === "q") fireSpecial("queen_capture", `${playerNames[color]} captured the queen!`);
-      else if (target.type === "r") fireSpecial("rook_capture", `${playerNames[color]} captured a rook!`);
+        color === 'w' ? chess.capW.push(target.type) : chess.capB.push(target.type);
     }
 
-    // En-passant capture
-    if (piece.type === "p" && g.ep && tr === g.ep[0] && tf === g.ep[1]) {
-      const cr = color === "w" ? tr + 1 : tr - 1;
-      const cp = g.board[cr][tf];
-      if (cp) color === "w" ? g.capW.push(cp.type) : g.capB.push(cp.type);
-      g.board[cr][tf] = null;
+    // En passant capture
+    if (piece.type === 'p' && chess.ep && tr === chess.ep[0] && tf === chess.ep[1]) {
+        const cr = color === 'w' ? tr + 1 : tr - 1;
+        const cp = chess.board[cr][tf];
+        if (cp) { color === 'w' ? chess.capW.push(cp.type) : chess.capB.push(cp.type); }
+        chess.board[cr][tf] = null;
     }
 
-    g.board[tr][tf] = { ...piece };
-    g.board[fr][ff] = null;
+    chess.board[tr][tf] = { ...piece };
+    chess.board[fr][ff] = null;
 
-    // Castling: move rook
-    if (piece.type === "k") {
-      if (tf - ff === 2) { g.board[tr][tf-1] = {type:"r",color}; g.board[tr][7] = null; fireSpecial("castling","Kingside castle!"); }
-      if (ff - tf === 2) { g.board[tr][tf+1] = {type:"r",color}; g.board[tr][0] = null; fireSpecial("castling","Queenside castle!"); }
-      g.castling[color+"k"] = false; g.castling[color+"q"] = false;
+    // Castling — move rook
+    if (piece.type === 'k') {
+        if (tf - ff === 2) { chess.board[tr][tf - 1] = { type: 'r', color }; chess.board[tr][7] = null; }
+        if (ff - tf === 2) { chess.board[tr][tf + 1] = { type: 'r', color }; chess.board[tr][0] = null; }
+        chess.castling[color + 'k'] = false;
+        chess.castling[color + 'q'] = false;
     }
-    if (piece.type === "r") {
-      if (ff === 0) g.castling[color+"q"] = false;
-      if (ff === 7) g.castling[color+"k"] = false;
+    if (piece.type === 'r') {
+        if (ff === 0) chess.castling[color + 'q'] = false;
+        if (ff === 7) chess.castling[color + 'k'] = false;
     }
 
-    // En-passant square
-    g.ep = (piece.type === "p" && Math.abs(tr - fr) === 2) ? [(fr+tr)/2, ff] : null;
+    chess.ep = null;
+    if (piece.type === 'p' && Math.abs(tr - fr) === 2) chess.ep = [(fr + tr) / 2, ff];
 
     // Promotion
-    if (piece.type === "p" && (tr === 0 || tr === 7)) {
-      g.promo = { fr, ff, tr, tf, color, san };
-      // Show promo modal with correct colored pieces
-      const modal    = document.getElementById("promo-modal");
-      const piecesEl = document.getElementById("promo-pieces");
-      piecesEl.innerHTML = "";
-      for (const t of ["q","r","b","n"]) {
-        const d = document.createElement("div");
-        d.className = "pp";
-        d.textContent = U[color + t];
-        d.addEventListener("click", () => ChessGame.promote(t));
-        piecesEl.appendChild(d);
-      }
-      modal.classList.add("show");
-      renderBoard();
-      return;
+    if (piece.type === 'p' && (tr === 0 || tr === 7)) {
+        if (silent) {
+            chess.board[tr][tf] = { type: 'q', color };
+        } else {
+            chess.promo = { fr, ff, tr, tf, color, san };
+            const pm = document.getElementById('promo-modal');
+            const pp = document.getElementById('promo-pieces');
+            pp.innerHTML = '';
+            ['q', 'r', 'b', 'n'].forEach(t => {
+                const d = document.createElement('div');
+                d.className = 'pp';
+                d.textContent = UNIC[color + t];
+                d.addEventListener('click', () => chessPromote(t));
+                pp.appendChild(d);
+            });
+            pm.classList.add('show');
+            cRender();
+            return;
+        }
     }
 
-    finishMove(fr, ff, tr, tf, color, san);
-  }
+    cFinish(fr, ff, tr, tf, color, san, silent, target);
+}
 
-  function finishMove(fr, ff, tr, tf, color, san) {
-    g.hist.push({ fr, ff, tr, tf, san, color });
-    g.sel = null; g.legal = [];
+function chessPromote(type) {
+    if (!chess.promo) return;
+    const { fr, ff, tr, tf, color, san } = chess.promo;
+    chess.board[tr][tf] = { type, color };
+    chess.promo = null;
+    document.getElementById('promo-modal').classList.remove('show');
+    cFinish(fr, ff, tr, tf, color, san + '=' + type.toUpperCase(), false, null);
+}
 
-    const nc     = color === "w" ? "b" : "w";
-    g.turn       = nc;
-    g.inCheck    = isInCheck(nc);
-    const hasLeg = hasAnyLegal(nc);
-    g.mate       = g.inCheck && !hasLeg;
-    g.stale      = !g.inCheck && !hasLeg;
+function cFinish(fr, ff, tr, tf, color, san, silent, target) {
+    chess.hist.push({ fr, ff, tr, tf, san, color });
+    chess.sel = null;
+    chess.legal = [];
 
-    const fullSan = san + (g.mate ? "#" : g.inCheck ? "+" : "");
-    addLog(fullSan, color);
+    const nc = color === 'w' ? 'b' : 'w';
+    chess.turn = nc;
+    chess.inCheck = cIsInCheck(nc);
 
-    if (callbacks.onMove) {
-      callbacks.onMove("move", `${playerNames[color]} played ${fullSan}`, ChessGame.getState());
+    const hasL = cHasLegal(nc);
+    chess.mate = chess.inCheck && !hasL;
+    chess.stale = !chess.inCheck && !hasL;
+
+    const fullSan = san + (chess.mate ? '#' : chess.inCheck ? '+' : '');
+
+    if (!silent) {
+        cAddLog(fullSan, color);
+
+        // Determine event notability for AI chat
+        const playerName = color === 'w' ? myUsername : 'Groq-AI';
+
+        if (chess.mate) {
+            cBroadcast(`Checkmate! ${playerName} wins! 🏆`);
+        } else if (chess.stale) {
+            cBroadcast(`Stalemate — Draw!`);
+        } else if (chess.inCheck) {
+            cBroadcast(`${playerName} played ${fullSan} — CHECK!`);
+        } else if (target && (target.type === 'q' || target.type === 'r')) {
+            // Major piece captured — notable
+            cBroadcast(`${playerName} captured ${target.type === 'q' ? 'queen' : 'rook'}! ${fullSan}`);
+        } else if (san === 'O-O' || san === 'O-O-O') {
+            cBroadcast(`${playerName} castled! ${fullSan}`);
+        } else if (san.includes('=')) {
+            cBroadcast(`${playerName} promoted a pawn! ${fullSan}`);
+        } else {
+            // Regular move — quiet broadcast
+            cBroadcastQuiet(`${playerName} played ${fullSan}`);
+        }
+
+        cRender();
+        cUpdateSide();
+
+        if (chess.mate) {
+            cSetStat(`Checkmate! ${playerName} wins! 🏆`);
+        } else if (chess.stale) {
+            cSetStat('Stalemate — Draw!');
+        } else if (chess.inCheck) {
+            cSetStat(`Check! ${nc === 'w' ? myUsername : "Groq-AI"}'s king is in check`);
+            if (nc === 'b') setTimeout(() => cAiMove(), 700);
+        } else {
+            if (nc === 'w') cSetStat('Your turn (White)');
+            else { cSetStat('Groq-AI thinking…'); setTimeout(() => cAiMove(), 700); }
+        }
     }
+}
 
-    renderBoard(); updateSide();
-
-    if (g.mate) {
-      setStatus(`Checkmate! ${playerNames[color]} wins! 🏆`);
-      fireSpecial("checkmate", `${playerNames[color]} wins by checkmate!`);
-      if (callbacks.onGameEnd) callbacks.onGameEnd(color, playerNames[color]);
-    } else if (g.stale) {
-      setStatus("Stalemate — Draw!");
-      fireSpecial("stalemate", "The game is a draw by stalemate!");
-      if (callbacks.onGameEnd) callbacks.onGameEnd("draw", "Draw");
-    } else if (g.inCheck) {
-      setStatus(`Check! ${playerNames[nc]}'s king is in check`);
-      fireSpecial("check", `${playerNames[color]} put ${playerNames[nc]}'s king in check!`);
-      if (!humanColors[nc]) setTimeout(() => aiMove(), 700);
-    } else {
-      setStatus(humanColors[nc] ? `${playerNames[nc]}'s turn` : "Groq-AI thinking…");
-      if (!humanColors[nc]) setTimeout(() => aiMove(), 700);
-    }
-  }
-
-  function execMoveSilent(fr, ff, tr, tf, color, promoType) {
-    const piece  = g.board[fr][ff]; if (!piece) return;
-    const target = g.board[tr][tf];
-    if (target) color === "w" ? g.capW.push(target.type) : g.capB.push(target.type);
-    if (piece.type==="p" && g.ep && tr===g.ep[0] && tf===g.ep[1]) {
-      const cr = color==="w"?tr+1:tr-1; const cp=g.board[cr][tf];
-      if (cp) color==="w"?g.capW.push(cp.type):g.capB.push(cp.type);
-      g.board[cr][tf]=null;
-    }
-    g.board[tr][tf]={...piece}; g.board[fr][ff]=null;
-    if (piece.type==="k"){
-      if(tf-ff===2){g.board[tr][tf-1]={type:"r",color};g.board[tr][7]=null;}
-      if(ff-tf===2){g.board[tr][tf+1]={type:"r",color};g.board[tr][0]=null;}
-      g.castling[color+"k"]=false; g.castling[color+"q"]=false;
-    }
-    if(piece.type==="r"){ if(ff===0)g.castling[color+"q"]=false; if(ff===7)g.castling[color+"k"]=false; }
-    g.ep = (piece.type==="p"&&Math.abs(tr-fr)===2)?[(fr+tr)/2,ff]:null;
-    if (piece.type==="p"&&(tr===0||tr===7)) g.board[tr][tf]={type:promoType||"q",color};
-    g.hist.push({fr,ff,tr,tf,san:"",color,promoType});
-    g.turn = color==="w"?"b":"w";
-    g.inCheck = isInCheck(g.turn);
-  }
-
-  // ── Move Generation ─────────────────────────────────────────
-
-  function getLegal(r, f, color) {
-    return getPseudo(r, f, color).filter(([tr, tf]) => {
-      const sb  = g.board.map(row => [...row]);
-      const sep = g.ep;
-      g.board[tr][tf] = { ...g.board[r][f] };
-      g.board[r][f]   = null;
-      if (g.board[tr][tf].type==="p"&&sep&&tr===sep[0]&&tf===sep[1]) {
-        g.board[color==="w"?tr+1:tr-1][tf] = null;
-      }
-      const ic = isInCheck(color);
-      g.board = sb; g.ep = sep;
-      return !ic;
+// ── Move generation ──
+function cGetLegal(r, f, color) {
+    return cPseudo(r, f, color).filter(([tr, tf]) => {
+        const sb = JSON.parse(JSON.stringify(chess.board));
+        const sep = chess.ep;
+        chess.board[tr][tf] = { ...chess.board[r][f] };
+        chess.board[r][f] = null;
+        if (chess.board[tr][tf].type === 'p' && sep && tr === sep[0] && tf === sep[1]) {
+            const cr = color === 'w' ? tr + 1 : tr - 1;
+            chess.board[cr][tf] = null;
+        }
+        const ic = cIsInCheck(color);
+        chess.board = sb;
+        chess.ep = sep;
+        return !ic;
     });
-  }
+}
 
-  function getPseudo(r, f, color) {
-    const p = g.board[r][f]; if (!p || p.color !== color) return [];
-    const mv = [], opp = color==="w"?"b":"w", dir = color==="w"?-1:1;
+function cPseudo(r, f, color) {
+    const p = chess.board[r][f];
+    if (!p || p.color !== color) return [];
+    const mv = [], opp = color === 'w' ? 'b' : 'w', dir = color === 'w' ? -1 : 1;
 
-    const add = (tr, tf) => {
-      if (tr<0||tr>7||tf<0||tf>7) return false;
-      const t = g.board[tr][tf]; if (t&&t.color===color) return false;
-      mv.push([tr,tf]); return !t;
+    const ai = (tr, tf) => {
+        if (tr < 0 || tr > 7 || tf < 0 || tf > 7) return false;
+        const t = chess.board[tr][tf];
+        if (t && t.color === color) return false;
+        mv.push([tr, tf]);
+        return !t;
     };
-    const slide = (dr, df) => {
-      let tr=r+dr, tf=f+df;
-      while (tr>=0&&tr<8&&tf>=0&&tf<8) {
-        const t=g.board[tr][tf]; if(t){if(t.color!==color)mv.push([tr,tf]);break;}
-        mv.push([tr,tf]); tr+=dr; tf+=df;
-      }
+
+    const sl = (dr, df) => {
+        let tr = r + dr, tf = f + df;
+        while (tr >= 0 && tr < 8 && tf >= 0 && tf < 8) {
+            const t = chess.board[tr][tf];
+            if (t) { if (t.color !== color) mv.push([tr, tf]); break; }
+            mv.push([tr, tf]);
+            tr += dr; tf += df;
+        }
     };
 
     switch (p.type) {
-      case "p": {
-        if (r+dir>=0&&r+dir<=7&&!g.board[r+dir][f]) {
-          mv.push([r+dir,f]);
-          const sr = color==="w"?6:1;
-          if (r===sr&&!g.board[r+2*dir][f]) mv.push([r+2*dir,f]);
+        case 'p': {
+            if (r + dir >= 0 && r + dir < 8 && !chess.board[r + dir][f]) {
+                mv.push([r + dir, f]);
+                const sr = color === 'w' ? 6 : 1;
+                if (r === sr && !chess.board[r + 2 * dir][f]) mv.push([r + 2 * dir, f]);
+            }
+            for (const df of [-1, 1]) {
+                const tr2 = r + dir, tf2 = f + df;
+                if (tr2 >= 0 && tr2 < 8 && tf2 >= 0 && tf2 < 8) {
+                    const t = chess.board[tr2][tf2];
+                    if (t && t.color === opp) mv.push([tr2, tf2]);
+                    if (chess.ep && tr2 === chess.ep[0] && tf2 === chess.ep[1]) mv.push([tr2, tf2]);
+                }
+            }
+            break;
         }
-        for (const df of [-1,1]) {
-          const tr2=r+dir, tf2=f+df;
-          if (tr2>=0&&tr2<=7&&tf2>=0&&tf2<=7) {
-            const t=g.board[tr2][tf2];
-            if (t&&t.color===opp) mv.push([tr2,tf2]);
-            if (g.ep&&tr2===g.ep[0]&&tf2===g.ep[1]) mv.push([tr2,tf2]);
-          }
+        case 'r': sl(1, 0); sl(-1, 0); sl(0, 1); sl(0, -1); break;
+        case 'b': sl(1, 1); sl(1, -1); sl(-1, 1); sl(-1, -1); break;
+        case 'q': sl(1, 0); sl(-1, 0); sl(0, 1); sl(0, -1); sl(1, 1); sl(1, -1); sl(-1, 1); sl(-1, -1); break;
+        case 'n':
+            [[2, 1], [2, -1], [-2, 1], [-2, -1], [1, 2], [1, -2], [-1, 2], [-1, -2]]
+                .forEach(([dr, df]) => ai(r + dr, f + df));
+            break;
+        case 'k': {
+            [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]]
+                .forEach(([dr, df]) => ai(r + dr, f + df));
+            const br = color === 'w' ? 7 : 0;
+            if (!chess.inCheck && r === br && f === 4) {
+                if (chess.castling[color + 'k'] && !chess.board[br][5] && !chess.board[br][6] &&
+                    !cAtk(br, 5, opp) && !cAtk(br, 6, opp)) mv.push([br, 6]);
+                if (chess.castling[color + 'q'] && !chess.board[br][3] && !chess.board[br][2] && !chess.board[br][1] &&
+                    !cAtk(br, 3, opp) && !cAtk(br, 2, opp)) mv.push([br, 2]);
+            }
+            break;
         }
-        break;
-      }
-      case "r": slide(1,0);slide(-1,0);slide(0,1);slide(0,-1); break;
-      case "b": slide(1,1);slide(1,-1);slide(-1,1);slide(-1,-1); break;
-      case "q": slide(1,0);slide(-1,0);slide(0,1);slide(0,-1);slide(1,1);slide(1,-1);slide(-1,1);slide(-1,-1); break;
-      case "n": for (const [dr,df] of [[2,1],[2,-1],[-2,1],[-2,-1],[1,2],[1,-2],[-1,2],[-1,-2]]) add(r+dr,f+df); break;
-      case "k": {
-        for (const [dr,df] of [[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]]) add(r+dr,f+df);
-        const br = color==="w"?7:0;
-        if (!g.inCheck&&r===br&&f===4) {
-          if (g.castling[color+"k"]&&!g.board[br][5]&&!g.board[br][6]&&!isAttacked(br,5,opp)&&!isAttacked(br,6,opp)) mv.push([br,6]);
-          if (g.castling[color+"q"]&&!g.board[br][3]&&!g.board[br][2]&&!g.board[br][1]&&!isAttacked(br,3,opp)&&!isAttacked(br,2,opp)) mv.push([br,2]);
-        }
-        break;
-      }
     }
     return mv;
-  }
+}
 
-  function isInCheck(color) {
-    let kr=-1, kf=-1;
-    for (let r=0;r<8;r++) for (let f=0;f<8;f++) { const p=g.board[r][f]; if(p&&p.type==="k"&&p.color===color){kr=r;kf=f;} }
-    if (kr===-1) return false;
-    return isAttacked(kr, kf, color==="w"?"b":"w");
-  }
+function cIsInCheck(color) {
+    let kr = -1, kf = -1;
+    for (let r = 0; r < 8; r++) {
+        for (let f = 0; f < 8; f++) {
+            const p = chess.board[r][f];
+            if (p && p.type === 'k' && p.color === color) { kr = r; kf = f; }
+        }
+    }
+    if (kr === -1) return false;
+    return cAtk(kr, kf, color === 'w' ? 'b' : 'w');
+}
 
-  function isAttacked(r, f, byColor) {
-    for (let sr=0;sr<8;sr++) for (let sf=0;sf<8;sf++) {
-      const p=g.board[sr][sf]; if(!p||p.color!==byColor) continue;
-      if (getPseudo(sr,sf,byColor).some(([mr,mf])=>mr===r&&mf===f)) return true;
+function cAtk(r, f, by) {
+    for (let sr = 0; sr < 8; sr++) {
+        for (let sf = 0; sf < 8; sf++) {
+            const p = chess.board[sr][sf];
+            if (!p || p.color !== by) continue;
+            if (cPseudo(sr, sf, by).some(([mr, mf]) => mr === r && mf === f)) return true;
+        }
     }
     return false;
-  }
+}
 
-  function hasAnyLegal(color) {
-    for (let r=0;r<8;r++) for (let f=0;f<8;f++) {
-      const p=g.board[r][f]; if(p&&p.color===color&&getLegal(r,f,color).length>0) return true;
+function cHasLegal(color) {
+    for (let r = 0; r < 8; r++) {
+        for (let f = 0; f < 8; f++) {
+            const p = chess.board[r][f];
+            if (p && p.color === color && cGetLegal(r, f, color).length > 0) return true;
+        }
     }
     return false;
-  }
+}
 
-  function makeSAN(fr, ff, tr, tf, piece, target, color) {
-    const files="abcdefgh", ranks="87654321";
-    if (piece.type==="k"&&Math.abs(tf-ff)===2) return tf>ff?"O-O":"O-O-O";
-    let s = "";
-    if (piece.type!=="p") s = piece.type.toUpperCase();
-    else if (target||(g.ep&&tr===g.ep[0]&&tf===g.ep[1])) s = files[ff];
-    if (target||(piece.type==="p"&&g.ep&&tr===g.ep[0]&&tf===g.ep[1])) s += "x";
+function cSAN(fr, ff, tr, tf, piece, target, color) {
+    const files = 'abcdefgh', ranks = '87654321';
+    if (piece.type === 'k' && Math.abs(tf - ff) === 2) return tf > ff ? 'O-O' : 'O-O-O';
+    let s = '';
+    if (piece.type !== 'p') s = piece.type.toUpperCase();
+    else if (target || (chess.ep && tr === chess.ep[0] && tf === chess.ep[1])) s = files[ff];
+    if (target || (piece.type === 'p' && chess.ep && tr === chess.ep[0] && tf === chess.ep[1])) s += 'x';
     return s + files[tf] + ranks[tr];
-  }
+}
 
-  // ── AI (Minimax depth-2 + alpha-beta) ──────────────────────
+// ── AI (minimax depth 2) ──
+const PV = { p: 100, n: 320, b: 330, r: 500, q: 900, k: 20000 };
+const PST = {
+    p: [[0, 0, 0, 0, 0, 0, 0, 0], [50, 50, 50, 50, 50, 50, 50, 50], [10, 10, 20, 30, 30, 20, 10, 10], [5, 5, 10, 25, 25, 10, 5, 5], [0, 0, 0, 20, 20, 0, 0, 0], [5, -5, -10, 0, 0, -10, -5, 5], [5, 10, 10, -20, -20, 10, 10, 5], [0, 0, 0, 0, 0, 0, 0, 0]],
+    n: [[-50, -40, -30, -30, -30, -30, -40, -50], [-40, -20, 0, 0, 0, 0, -20, -40], [-30, 0, 10, 15, 15, 10, 0, -30], [-30, 5, 15, 20, 20, 15, 5, -30], [-30, 0, 15, 20, 20, 15, 0, -30], [-30, 5, 10, 15, 15, 10, 5, -30], [-40, -20, 0, 5, 5, 0, -20, -40], [-50, -40, -30, -30, -30, -30, -40, -50]],
+    b: [[-20, -10, -10, -10, -10, -10, -10, -20], [-10, 0, 0, 0, 0, 0, 0, -10], [-10, 0, 5, 10, 10, 5, 0, -10], [-10, 5, 5, 10, 10, 5, 5, -10], [-10, 0, 10, 10, 10, 10, 0, -10], [-10, 10, 10, 10, 10, 10, 10, -10], [-10, 5, 0, 0, 0, 0, 5, -10], [-20, -10, -10, -10, -10, -10, -10, -20]],
+    r: [[0, 0, 0, 0, 0, 0, 0, 0], [5, 10, 10, 10, 10, 10, 10, 5], [-5, 0, 0, 0, 0, 0, 0, -5], [-5, 0, 0, 0, 0, 0, 0, -5], [-5, 0, 0, 0, 0, 0, 0, -5], [-5, 0, 0, 0, 0, 0, 0, -5], [-5, 0, 0, 0, 0, 0, 0, -5], [0, 0, 0, 5, 5, 0, 0, 0]],
+    q: [[-20, -10, -10, -5, -5, -10, -10, -20], [-10, 0, 0, 0, 0, 0, 0, -10], [-10, 0, 5, 5, 5, 5, 0, -10], [-5, 0, 5, 5, 5, 5, 0, -5], [0, 0, 5, 5, 5, 5, 0, -5], [-10, 5, 5, 5, 5, 5, 0, -10], [-10, 0, 5, 0, 0, 0, 0, -10], [-20, -10, -10, -5, -5, -10, -10, -20]],
+    k: [[-30, -40, -40, -50, -50, -40, -40, -30], [-30, -40, -40, -50, -50, -40, -40, -30], [-30, -40, -40, -50, -50, -40, -40, -30], [-30, -40, -40, -50, -50, -40, -40, -30], [-20, -30, -30, -40, -40, -30, -30, -20], [-10, -20, -20, -20, -20, -20, -20, -10], [20, 20, 0, 0, 0, 0, 20, 20], [20, 30, 10, 0, 0, 10, 30, 20]]
+};
 
-  function aiMove() {
-    if (g.turn!=="b"||g.mate||g.stale||!g.started) return;
-    aiRunning = true;
+function cEval() {
+    let s = 0;
+    for (let r = 0; r < 8; r++) {
+        for (let f = 0; f < 8; f++) {
+            const p = chess.board[r][f];
+            if (!p) continue;
+            const pr = p.color === 'w' ? r : 7 - r;
+            s += (p.color === 'b' ? 1 : -1) * (PV[p.type] + (PST[p.type]?.[pr]?.[f] || 0));
+        }
+    }
+    return s;
+}
+
+function cAiMove() {
+    if (chess.turn !== 'b' || chess.mate || chess.stale || !chess.started) return;
+    cAiRunning = true;
     setTimeout(() => {
-      const move = minimaxRoot();
-      aiRunning = false;
-      if (move) { g.sel=null; g.legal=[]; execMove(move.fr,move.ff,move.tr,move.tf,"b"); }
+        const move = cMinimax();
+        cAiRunning = false;
+        if (move) {
+            chess.sel = null;
+            chess.legal = [];
+            cExec(move.fr, move.ff, move.tr, move.tf, 'b');
+        }
     }, 350);
-  }
+}
 
-  function evalBoard() {
-    let score = 0;
-    for (let r=0;r<8;r++) for (let f=0;f<8;f++) {
-      const p=g.board[r][f]; if(!p) continue;
-      const pr = p.color==="w"?r:7-r;
-      score += (p.color==="b"?1:-1) * (PV[p.type] + (PST[p.type]?.[pr]?.[f]||0));
+function cMinimax() {
+    let bestS = -Infinity, bestM = null;
+    const sBoard = JSON.parse(JSON.stringify(chess.board));
+    const sCast = JSON.parse(JSON.stringify(chess.castling));
+    const sEP = chess.ep, sTurn = chess.turn, sCheck = chess.inCheck;
+
+    for (let fr = 0; fr < 8; fr++) {
+        for (let ff = 0; ff < 8; ff++) {
+            const p = chess.board[fr][ff];
+            if (!p || p.color !== 'b') continue;
+            const moves = cGetLegal(fr, ff, 'b');
+            for (const [tr, tf] of moves) {
+                const nb = JSON.parse(JSON.stringify(chess.board));
+                chess.board = nb;
+                const piece = chess.board[fr][ff];
+                chess.board[tr][tf] = piece;
+                chess.board[fr][ff] = null;
+                if (piece.type === 'p' && (tr === 0 || tr === 7)) chess.board[tr][tf] = { type: 'q', color: 'b' };
+                chess.turn = 'w';
+                chess.inCheck = cIsInCheck('w');
+                const score = cAB(1, false, -Infinity, Infinity);
+                chess.board = sBoard;
+                chess.castling = sCast;
+                chess.ep = sEP;
+                chess.turn = sTurn;
+                chess.inCheck = sCheck;
+                if (score > bestS) { bestS = score; bestM = { fr, ff, tr, tf }; }
+            }
+        }
     }
-    return score;
-  }
+    return bestM;
+}
 
-  function minimaxRoot() {
-    let bestScore=-Infinity, bestMove=null;
-    const sb=g.board.map(r=>[...r]), sc=JSON.parse(JSON.stringify(g.castling)), se=g.ep;
-    const sChk=g.inCheck;
+function cAB(depth, maximizing, alpha, beta) {
+    if (depth === 0) return cEval();
+    const color = maximizing ? 'b' : 'w';
+    let best = maximizing ? -Infinity : Infinity;
+    let moved = false;
 
-    for (let fr=0;fr<8;fr++) for (let ff=0;ff<8;ff++) {
-      const p=g.board[fr][ff]; if(!p||p.color!=="b") continue;
-      g.turn="b"; g.inCheck=sChk;
-      const moves=getLegal(fr,ff,"b");
-      g.board=sb.map(r=>[...r]); g.castling=JSON.parse(JSON.stringify(sc)); g.ep=se;
+    const sB = JSON.parse(JSON.stringify(chess.board));
+    const sC = JSON.parse(JSON.stringify(chess.castling));
+    const sE = chess.ep, sTu = chess.turn, sCh = chess.inCheck;
 
-      for (const [tr,tf] of moves) {
-        const nb=sb.map(r=>[...r]);
-        const nc=JSON.parse(JSON.stringify(sc));
-        const piece=nb[fr][ff];
-        nb[tr][tf]=piece; nb[fr][ff]=null;
-        if (piece.type==="p"&&(tr===0||tr===7)) nb[tr][tf]={type:"q",color:"b"};
-        if (piece.type==="k"){nc["bk"]=false;nc["bq"]=false;}
-        if (piece.type==="r"){if(ff===0)nc["bq"]=false;if(ff===7)nc["bk"]=false;}
-        const nep=(piece.type==="p"&&Math.abs(tr-fr)===2)?[(fr+tr)/2,ff]:null;
-
-        const prevBoard=g.board, prevCast=g.castling, prevEp=g.ep, prevTurn=g.turn, prevChk=g.inCheck;
-        g.board=nb; g.castling=nc; g.ep=nep; g.turn="w"; g.inCheck=isInCheck("w");
-        const score=alphaBeta(1,false,-Infinity,Infinity);
-        g.board=prevBoard; g.castling=prevCast; g.ep=prevEp; g.turn=prevTurn; g.inCheck=prevChk;
-
-        if (score>bestScore) { bestScore=score; bestMove={fr,ff,tr,tf}; }
-      }
-    }
-    g.board=sb; g.castling=sc; g.ep=se; g.inCheck=sChk; g.turn="b";
-    return bestMove;
-  }
-
-  function alphaBeta(depth, maximizing, alpha, beta) {
-    if (depth===0) return evalBoard();
-    const color=maximizing?"b":"w";
-    let best=maximizing?-Infinity:Infinity;
-    let moved=false;
-    const sb=g.board.map(r=>[...r]), sc=JSON.parse(JSON.stringify(g.castling)), se=g.ep, st=g.turn, sChk=g.inCheck;
-
-    outer:
-    for (let fr=0;fr<8;fr++) for (let ff=0;ff<8;ff++) {
-      const p=g.board[fr][ff]; if(!p||p.color!==color) continue;
-      g.turn=color; g.inCheck=sChk;
-      const moves=getLegal(fr,ff,color);
-      g.board=sb.map(r=>[...r]); g.castling=JSON.parse(JSON.stringify(sc)); g.ep=se;
-
-      for (const [tr,tf] of moves) {
-        moved=true;
-        const nb=sb.map(r=>[...r]);
-        const nc=JSON.parse(JSON.stringify(sc));
-        const piece=nb[fr][ff];
-        nb[tr][tf]=piece; nb[fr][ff]=null;
-        if (piece.type==="p"&&(tr===0||tr===7)) nb[tr][tf]={type:"q",color};
-        if (piece.type==="k"){nc[color+"k"]=false;nc[color+"q"]=false;}
-        if (piece.type==="r"){if(ff===0)nc[color+"q"]=false;if(ff===7)nc[color+"k"]=false;}
-        const nep=(piece.type==="p"&&Math.abs(tr-fr)===2)?[(fr+tr)/2,ff]:null;
-
-        g.board=nb; g.castling=nc; g.ep=nep; g.turn=color==="w"?"b":"w"; g.inCheck=isInCheck(g.turn);
-        const score=alphaBeta(depth-1,!maximizing,alpha,beta);
-        g.board=sb.map(r=>[...r]); g.castling=JSON.parse(JSON.stringify(sc)); g.ep=se; g.turn=st; g.inCheck=sChk;
-
-        if (maximizing){best=Math.max(best,score);alpha=Math.max(alpha,best);}
-        else{best=Math.min(best,score);beta=Math.min(beta,best);}
-        if (beta<=alpha) break outer;
-      }
+    outer: for (let fr = 0; fr < 8; fr++) {
+        for (let ff = 0; ff < 8; ff++) {
+            const p = chess.board[fr][ff];
+            if (!p || p.color !== color) continue;
+            chess.turn = color;
+            chess.inCheck = sCh;
+            const ms = cGetLegal(fr, ff, color);
+            for (const [tr, tf] of ms) {
+                moved = true;
+                const nb = JSON.parse(JSON.stringify(sB));
+                chess.board = nb;
+                const piece = chess.board[fr][ff];
+                chess.board[tr][tf] = piece;
+                chess.board[fr][ff] = null;
+                if (piece.type === 'p' && (tr === 0 || tr === 7)) chess.board[tr][tf] = { type: 'q', color };
+                chess.turn = color === 'w' ? 'b' : 'w';
+                chess.inCheck = cIsInCheck(chess.turn);
+                const sc = cAB(depth - 1, !maximizing, alpha, beta);
+                chess.board = sB;
+                chess.castling = sC;
+                chess.ep = sE;
+                chess.turn = sTu;
+                chess.inCheck = sCh;
+                if (maximizing) { best = Math.max(best, sc); alpha = Math.max(alpha, best); }
+                else { best = Math.min(best, sc); beta = Math.min(beta, best); }
+                if (beta <= alpha) break outer;
+            }
+        }
     }
     return moved ? best : (maximizing ? -99999 : 99999);
-  }
+}
 
-  // ── Rendering ───────────────────────────────────────────────
-
-  function renderBoard() {
-    const bd = document.getElementById("chess-board"); if (!bd) return;
-    bd.innerHTML = "";
-
-    for (let r=0;r<8;r++) for (let f=0;f<8;f++) {
-      const cell = document.createElement("div");
-      cell.className = "cc " + ((r+f)%2===0 ? "lt" : "dk");
-      cell.dataset.r=r; cell.dataset.f=f;
-      const p=g.board[r][f];
-      if (p) cell.textContent = U[p.color+p.type];
-
-      if (g.sel && g.sel[0]===r && g.sel[1]===f) cell.classList.add("sel");
-      const isLegal = g.legal.some(m=>m[0]===r&&m[1]===f);
-      if (isLegal) {
-        if (p && p.color!==g.turn) cell.classList.add("lc2");
-        else cell.classList.add("lm");
-      }
-      if (g.inCheck && p && p.type==="k" && p.color===g.turn) cell.classList.add("chk");
-
-      cell.addEventListener("click", () => ChessGame.handleClick(r, f));
-      bd.appendChild(cell);
+// ── Undo ──
+function chessUndo() {
+    if (chess.hist.length < 2 || cAiRunning) return;
+    const moves = chess.hist.slice(0, -2);
+    chess = chessInitState();
+    chess.started = true;
+    document.getElementById('clog').innerHTML = '';
+    for (const m of moves) {
+        const piece = chess.board[m.fr][m.ff];
+        if (!piece) continue;
+        const target = chess.board[m.tr][m.tf];
+        if (target) { m.color === 'w' ? chess.capW.push(target.type) : chess.capB.push(target.type); }
+        chess.board[m.tr][m.tf] = { ...piece };
+        chess.board[m.fr][m.ff] = null;
+        if (piece.type === 'k') { chess.castling[m.color + 'k'] = false; chess.castling[m.color + 'q'] = false; }
+        if (piece.type === 'r') { if (m.ff === 0) chess.castling[m.color + 'q'] = false; if (m.ff === 7) chess.castling[m.color + 'k'] = false; }
+        chess.ep = null;
+        if (piece.type === 'p' && Math.abs(m.tr - m.fr) === 2) chess.ep = [(m.fr + m.tr) / 2, m.ff];
+        if (piece.type === 'p' && (m.tr === 0 || m.tr === 7)) chess.board[m.tr][m.tf] = { type: 'q', color: m.color };
+        chess.hist.push(m);
+        chess.turn = m.color === 'w' ? 'b' : 'w';
+        cAddLog(m.san, m.color);
     }
-  }
+    chess.inCheck = cIsInCheck(chess.turn);
+    cRender();
+    cUpdateSide();
+    cSetStat('Your turn (White)');
+}
 
-  function updateSide() {
-    const sw=document.getElementById("chess-slot-w");
-    const sb=document.getElementById("chess-slot-b");
-    if(sw) sw.classList.toggle("active", g.turn==="w"&&!g.mate&&!g.stale);
-    if(sb) sb.classList.toggle("active", g.turn==="b"&&!g.mate&&!g.stale);
-    const cw=document.getElementById("cap-w");
-    const cb=document.getElementById("cap-b");
-    if(cw) cw.textContent = g.capW.map(t=>U["b"+t]).join("");
-    if(cb) cb.textContent = g.capB.map(t=>U["w"+t]).join("");
-  }
+// ── Broadcasting ──
+// Notable broadcast — triggers AI
+function cBroadcast(event) {
+    if (!ws || ws.readyState !== 1) return;
+    wsSend({
+        sender: myUsername,
+        message: `__CHESS__:${JSON.stringify({ event, turn: chess.turn })}`,
+        image: null
+    });
+    appendGameMsg(event);
+}
 
-  function setStatus(msg) { const el=document.getElementById("c-status"); if(el)el.textContent=msg; }
+// Quiet broadcast — no AI trigger
+function cBroadcastQuiet(event) {
+    if (!ws || ws.readyState !== 1) return;
+    wsSend({
+        sender: myUsername,
+        message: `__CHESS__:${JSON.stringify({ event: 'move', turn: chess.turn })}`,
+        image: null
+    });
+    appendGameMsg(event);
+}
 
-  function addLog(san, color) {
-    const log=document.getElementById("c-log"); if(!log) return;
-    const mn=Math.ceil(g.hist.length/2);
-    if (color==="w") {
-      const row=document.createElement("div"); row.className="move-row";
-      row.innerHTML=`<span class="mn">${mn}.</span><span class="mw">${san}</span><span class="mb2" id="clb${mn}"></span>`;
-      log.appendChild(row);
-    } else {
-      const sp=document.getElementById(`clb${mn}`);
-      if(sp) sp.textContent=san;
-      else {
-        const row=document.createElement("div"); row.className="move-row";
-        row.innerHTML=`<span class="mn">${mn}.</span><span class="mw">…</span><span class="mb2">${san}</span>`;
-        log.appendChild(row);
-      }
+function handleChessSync(data) {
+    try {
+        const d = JSON.parse(data.message.replace('__CHESS__:', ''));
+        appendGameMsg(d.event || 'Chess update');
+    } catch (e) { }
+}
+
+function chessReset() {
+    cAiRunning = false;
+    chessInit();
+    cBroadcast('New Chess game started!');
+}
+
+// ── Build coords on load ──
+(function () {
+    const cf = document.getElementById('cfiles');
+    if (cf) {
+        'abcdefgh'.split('').forEach(f => {
+            const s = document.createElement('span');
+            s.textContent = f;
+            cf.appendChild(s);
+        });
     }
-    log.scrollTop=log.scrollHeight;
-  }
-
-  // ── Events ──────────────────────────────────────────────────
-  function fireSpecial(eventType, detail) {
-    if (callbacks.onSpecialEvent) callbacks.onSpecialEvent(eventType, detail, ChessGame.getState());
-  }
-
-  // ── Exports ──────────────────────────────────────────────────
-  global.ChessGame = ChessGame;
-
-})(window);
+    const cr = document.getElementById('cranks');
+    if (cr) {
+        for (let r = 0; r < 8; r++) {
+            const s = document.createElement('span');
+            s.textContent = 8 - r;
+            cr.appendChild(s);
+        }
+    }
+})();
