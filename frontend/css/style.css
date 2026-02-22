@@ -1664,7 +1664,437 @@ body {
     flex-shrink: 0;
 }
 
+/* ═══════════════════════════
+   SCRIBBLE GAME
+   ═══════════════════════════ */
+
+.scribble-layout {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px 16px;
+    width: 100%;
+}
+
+.scribble-top {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+
+.scribble-time-txt {
+    font-family: 'Rajdhani', sans-serif;
+    font-weight: 700;
+    font-size: 1.1em;
+    min-width: 38px;
+    text-align: center;
+    color: var(--accent);
+}
+
+.scribble-timer-bar {
+    flex: 1;
+    height: 10px;
+    background: rgba(255, 255, 255, .08);
+    border-radius: 6px;
+    overflow: hidden;
+    min-width: 80px;
+}
+
+.scribble-timer-fill {
+    height: 100%;
+    width: 100%;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    border-radius: 6px;
+    transition: width .3s;
+}
+
+.scribble-timer-fill.low {
+    background: linear-gradient(90deg, #ff4444, #ff6622) !important;
+    animation: pulse-bar .5s infinite alternate;
+}
+
+@keyframes pulse-bar {
+    from {
+        opacity: .7;
+    }
+
+    to {
+        opacity: 1;
+    }
+}
+
+.scribble-hint {
+    font-family: 'Rajdhani', monospace;
+    font-size: 1.3em;
+    font-weight: 700;
+    letter-spacing: 3px;
+    color: var(--text1);
+    text-align: center;
+    min-width: 100%;
+}
+
+.scribble-round {
+    font-size: .75em;
+    color: var(--text2);
+    font-weight: 600;
+}
+
+/* Canvas */
+.scribble-canvas-wrap {
+    width: 100%;
+    max-width: 560px;
+    border: 2px solid rgba(255, 255, 255, .12);
+    border-radius: 10px;
+    overflow: hidden;
+    background: #fff;
+}
+
+.scribble-canvas-wrap canvas {
+    display: block;
+    width: 100%;
+    cursor: crosshair;
+}
+
+/* Toolbar */
+.scribble-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    align-items: center;
+    justify-content: center;
+    padding: 6px 10px;
+    background: rgba(255, 255, 255, .05);
+    border-radius: 8px;
+    width: 100%;
+    max-width: 560px;
+}
+
+.scolor-btn {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    border: 2px solid transparent;
+    cursor: pointer;
+    transition: transform .15s, border-color .15s;
+}
+
+.scolor-btn.active {
+    border-color: var(--accent);
+    transform: scale(1.2);
+    box-shadow: 0 0 8px var(--accent);
+}
+
+.scolor-btn:hover {
+    transform: scale(1.15);
+}
+
+.stool-sep {
+    width: 1px;
+    height: 24px;
+    background: rgba(255, 255, 255, .15);
+    margin: 0 4px;
+}
+
+.ssize-btn {
+    width: 30px;
+    height: 30px;
+    border-radius: 6px;
+    border: 2px solid transparent;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: border-color .15s;
+}
+
+.ssize-btn.active {
+    border-color: var(--accent);
+}
+
+.ssize-dot {
+    background: var(--text1);
+    border-radius: 50%;
+}
+
+.stool-btn {
+    padding: 4px 10px;
+    background: rgba(255, 255, 255, .08);
+    border: 1px solid rgba(255, 255, 255, .12);
+    border-radius: 6px;
+    color: var(--text1);
+    font-size: .72em;
+    cursor: pointer;
+    font-family: 'Inter', sans-serif;
+    transition: background .15s;
+}
+
+.stool-btn:hover {
+    background: rgba(255, 255, 255, .16);
+}
+
+/* Guess input row (when AI draws) */
+.scribble-guess-row {
+    display: flex;
+    gap: 8px;
+    width: 100%;
+    max-width: 560px;
+    align-items: center;
+}
+
+.scribble-guess-row input {
+    flex: 1;
+    padding: 10px 14px;
+    background: rgba(255, 255, 255, .06);
+    border: 1.5px solid rgba(255, 255, 255, .15);
+    border-radius: 8px;
+    color: var(--text1);
+    font-size: .9em;
+    font-family: 'Inter', sans-serif;
+    outline: none;
+    transition: border-color .2s;
+}
+
+.scribble-guess-row input:focus {
+    border-color: var(--accent);
+}
+
+.scribble-guess-row button {
+    padding: 10px 22px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    border: none;
+    border-radius: 8px;
+    color: #fff;
+    font-weight: 600;
+    font-family: 'Rajdhani', sans-serif;
+    font-size: .95em;
+    cursor: pointer;
+    letter-spacing: .5px;
+    transition: transform .15s, box-shadow .15s;
+}
+
+.scribble-guess-row button:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 16px rgba(124, 106, 247, .4);
+}
+
+/* Scores */
+.scribble-scores {
+    display: flex;
+    gap: 10px;
+    width: 100%;
+    max-width: 560px;
+    justify-content: center;
+}
+
+.sscore-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 8px 18px;
+    background: rgba(255, 255, 255, .05);
+    border-radius: 8px;
+    min-width: 80px;
+    gap: 2px;
+}
+
+.ss-name {
+    font-size: .72em;
+    color: var(--text2);
+}
+
+.ss-pts {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 1.5em;
+    font-weight: 700;
+    color: var(--text1);
+}
+
+.ss-you {
+    border-bottom: 2px solid var(--accent);
+}
+
+.ss-groq {
+    border-bottom: 2px solid #5eff89;
+}
+
+.ss-router {
+    border-bottom: 2px solid #87b5ff;
+}
+
+/* Word picker overlay */
+.scribble-word-pick {
+    position: absolute;
+    inset: 0;
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 18px;
+    background: rgba(12, 10, 30, .92);
+    backdrop-filter: blur(8px);
+    z-index: 50;
+    border-radius: 12px;
+}
+
+.scribble-word-pick.show {
+    display: flex;
+}
+
+.scribble-word-pick h3 {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 1.2em;
+    color: var(--text1);
+}
+
+.word-options {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+
+.word-opt {
+    padding: 10px 24px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    border: none;
+    border-radius: 10px;
+    color: #fff;
+    font-family: 'Rajdhani', sans-serif;
+    font-weight: 700;
+    font-size: 1em;
+    cursor: pointer;
+    letter-spacing: 1px;
+    transition: transform .15s, box-shadow .15s;
+}
+
+.word-opt:hover {
+    transform: scale(1.05);
+    box-shadow: 0 4px 20px rgba(124, 106, 247, .5);
+}
+
+/* Result overlay */
+.scribble-result {
+    position: absolute;
+    inset: 0;
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    background: rgba(12, 10, 30, .92);
+    backdrop-filter: blur(8px);
+    z-index: 50;
+    border-radius: 12px;
+}
+
+.scribble-result.show {
+    display: flex;
+}
+
+.scribble-result h3 {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 1.5em;
+    color: var(--text1);
+    animation: pop .3s;
+}
+
+.scribble-result p {
+    color: var(--text2);
+    font-size: .9em;
+}
+
+/* ═══════════════════════════
+   LIVE CHAT OVERLAY
+   ═══════════════════════════ */
+
+.live-chat-overlay {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    max-height: 200px;
+    display: none;
+    flex-direction: column;
+    background: rgba(12, 10, 30, .78);
+    backdrop-filter: blur(8px);
+    border-top: 1px solid rgba(255, 255, 255, .1);
+    z-index: 1100;
+    padding: 6px 8px;
+}
+
+.game-area.active~.live-chat-overlay,
+.live-chat-overlay {
+    display: flex;
+}
+
+.live-chat-msgs {
+    flex: 1;
+    overflow-y: auto;
+    padding: 4px;
+    font-size: .75em;
+}
+
+.live-msg {
+    padding: 2px 0;
+    color: rgba(255, 255, 255, .75);
+    line-height: 1.4;
+}
+
+.live-name {
+    font-weight: 600;
+    margin-right: 4px;
+}
+
+.live-name-user {
+    color: var(--accent);
+}
+
+.live-name-groq {
+    color: #5eff89;
+}
+
+.live-name-router {
+    color: #87b5ff;
+}
+
+.live-name-system {
+    color: #ffcc00;
+}
+
+.live-chat-input {
+    display: flex;
+    gap: 6px;
+    padding: 4px 0 2px;
+}
+
+.live-chat-input input {
+    flex: 1;
+    padding: 6px 10px;
+    background: rgba(255, 255, 255, .06);
+    border: 1px solid rgba(255, 255, 255, .12);
+    border-radius: 6px;
+    color: var(--text1);
+    font-size: .82em;
+    outline: none;
+}
+
+.live-chat-input button {
+    padding: 6px 14px;
+    background: var(--accent);
+    border: none;
+    border-radius: 6px;
+    color: #fff;
+    font-weight: 600;
+    font-size: .8em;
+    cursor: pointer;
+}
+
 /* ══ DESKTOP ══ */
+
 @media (min-width: 800px) {
     body {
         padding: 16px;

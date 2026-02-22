@@ -161,25 +161,36 @@
                     <div class="game-start-screen" id="scribble-start-screen">
                         <div class="game-icon">🎨</div>
                         <h2>Scribble</h2>
-                        <p>Draw a word and let the AIs guess! Pick from 3 words, draw on the canvas, and watch Groq-AI
-                            and Router-AI try to figure it out.</p>
+                        <p>Draw a word and let the AIs guess! Then watch them draw and try to guess their word. Take
+                            turns across 6 rounds!</p>
                         <button class="btn-start-game" onclick="startScribbleGame()">Start Scribble →</button>
                     </div>
                     <div id="scribble-game-area" style="display:none;width:100%;position:relative;">
                         <div class="pane-hdr">
                             <button class="btn-back" onclick="exitGameMode()">← Back</button>
-                            <h2>🎨 Scribble — Draw & AI Guesses</h2>
+                            <h2>🎨 Scribble — Draw & Guess</h2>
                             <button class="bnew" onclick="scribbleReset()">Quit</button>
                         </div>
                         <div class="scribble-layout">
-                            <!-- Top: timer + hint + round -->
+                            <!-- Top: timer + hint + round + drawer info -->
                             <div class="scribble-top">
                                 <div class="scribble-time-txt" id="timer-txt">60s</div>
                                 <div class="scribble-timer-bar">
                                     <div class="scribble-timer-fill" id="timer-fill"></div>
                                 </div>
                                 <div class="scribble-hint" id="scribble-hint">_ _ _ _ _</div>
-                                <div class="scribble-round" id="scribble-round">Round 1/5</div>
+                                <div class="scribble-round" id="scribble-round">Round 1/6</div>
+                            </div>
+
+                            <!-- Drawer info + word display -->
+                            <div
+                                style="display:flex;align-items:center;gap:10px;width:100%;justify-content:center;flex-wrap:wrap;">
+                                <div id="scribble-drawer-info"
+                                    style="font-size:.85em;font-weight:600;font-family:'Rajdhani',sans-serif;">✏️ Your
+                                    turn to draw!</div>
+                                <div id="scribble-your-word"
+                                    style="display:none;padding:4px 14px;background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;border-radius:8px;font-size:.82em;font-weight:600;">
+                                </div>
                             </div>
 
                             <!-- Canvas -->
@@ -187,8 +198,21 @@
                                 <canvas id="scribble-canvas"></canvas>
                             </div>
 
-                            <!-- Toolbar -->
+                            <!-- Clue area (shown when AI draws) -->
+                            <div id="scribble-clue-area"
+                                style="display:none;width:100%;text-align:center;padding:6px;font-size:.8em;color:var(--text2);">
+                                Clues will appear on the canvas. Type your guess below!
+                            </div>
+
+                            <!-- Drawing Toolbar (shown when user draws) -->
                             <div id="scribble-toolbar" class="scribble-toolbar"></div>
+
+                            <!-- Guess input (shown when AI draws) -->
+                            <div id="scribble-guess-row" class="scribble-guess-row" style="display:none;">
+                                <input type="text" id="scribble-guess-inp" placeholder="Type your guess…"
+                                    onkeypress="if(event.key==='Enter')sSubmitGuess()">
+                                <button onclick="sSubmitGuess()">Guess</button>
+                            </div>
 
                             <!-- Scores -->
                             <div class="scribble-scores">

@@ -536,6 +536,111 @@ async def _vision_guess(api_key: str, image_data: str, prompt: str) -> str:
         return None
 
 
+# ── Scribble AI Draw Turn (generate clues) ──────────────────────
+
+SCRIBBLE_WORD_BANK = [
+    'apple', 'banana', 'car', 'dog', 'elephant', 'fish', 'guitar', 'house',
+    'jellyfish', 'kite', 'lion', 'moon', 'octopus', 'pizza', 'robot',
+    'sun', 'tree', 'umbrella', 'violin', 'whale', 'zebra',
+    'airplane', 'butterfly', 'castle', 'dinosaur', 'flower', 'ghost', 'helicopter',
+    'kangaroo', 'laptop', 'mushroom', 'ninja', 'owl', 'penguin',
+    'rainbow', 'spider', 'tornado', 'unicorn', 'volcano', 'dragon', 'rocket',
+    'camera', 'diamond', 'grapes', 'hammer', 'igloo', 'key',
+    'lamp', 'mountain', 'ocean', 'parachute', 'skateboard', 'telescope',
+    'star', 'sword', 'crown', 'anchor', 'balloon',
+    'candle', 'drum', 'flag', 'globe', 'heart',
+    'leaf', 'magnet', 'nest', 'orange', 'pencil', 'rose',
+    'snowflake', 'tent', 'cat', 'bird', 'frog', 'snake',
+    'turtle', 'rabbit', 'bear', 'bee', 'eagle', 'fox',
+    'giraffe', 'horse', 'koala', 'monkey', 'panda', 'shark', 'tiger', 'wolf',
+    'boat', 'bridge', 'bus', 'chair', 'clock', 'door',
+    'glasses', 'hat', 'ladder', 'mirror', 'piano', 'scissors', 'table',
+    'train', 'truck', 'basketball', 'football', 'medal',
+    'trophy', 'fire', 'lightning', 'cloud', 'rain', 'snow',
+    'beach', 'forest', 'cave', 'river', 'lighthouse',
+    'burger', 'taco', 'sushi', 'cake', 'cookie', 'donut', 'popcorn',
+    'bicycle', 'compass', 'backpack', 'shoe', 'watch', 'bell',
+    'cherry', 'lemon', 'strawberry', 'pineapple', 'carrot', 'tomato'
+]
+
+SCRIBBLE_CLUE_PROMPT = """You are playing a drawing guessing game. You are the DRAWER for the word "{word}".
+You need to give 5 progressive clues to help guessers figure out the word WITHOUT saying the word itself.
+Start vague and get more specific. Do NOT use the word or obvious derivatives.
+
+Rules:
+- Each clue should be 3-8 words max
+- Clue 1: Very vague category or feeling
+- Clue 2: Physical attribute or characteristic
+- Clue 3: Where you might find it or how it's used
+- Clue 4: More specific detail
+- Clue 5: Almost a giveaway but still doesn't say the word
+
+Reply with EXACTLY 5 lines, one clue per line. Nothing else."""
+
+
+async def scribble_ai_draw(room: str, drawer: str):
+    """AI's turn to draw: pick a word, generate clues, send to clients."""
+    api_key = os.getenv("GROQ_API_KEY")
+
+    # Pick a random word
+    word = random.choice(SCRIBBLE_WORD_BANK)
+
+    # Store the word in room state for validation
+    room_game_state[room] = {
+        "type": "scribble",
+        "data": {"current_word": word, "drawer": drawer}
+    }
+
+    # Generate clues (try AI, fallback to generic)
+    clues = []
+    if api_key:
+        try:
+            prompt = SCRIBBLE_CLUE_PROMPT.format(word=word)
+
+            async with httpx.AsyncClient() as client:
+                resp = await client.post(
+                    "https://api.groq.com/openai/v1/chat/completions",
+                    headers={"Authorization": f"Bearer {api_key}"},
+                    json={
+                        "model": "llama-3.3-70b-versatile",
+                        "messages": [{"role": "user", "content": prompt}],
+                        "temperature": 0.7,
+                        "max_tokens": 150,
+                    },
+                    timeout=15.0,
+                )
+
+            if resp.status_code == 200:
+                raw = resp.json()["choices"][0]["message"]["content"].strip()
+                lines = [l.strip().lstrip("0123456789.-) ") for l in raw.split("\n") if l.strip()]
+                clues = lines[:5]
+        except Exception:
+            pass
+
+    # Fallback generic clues if AI fails
+    if len(clues) < 3:
+        clues = [
+            f"It has {len(word)} letters",
+            f"Think about everyday objects",
+            f"It starts with '{word[0].upper()}'",
+            f"The second letter is '{word[1].upper()}'" if len(word) > 1 else "Short word!",
+            f"Almost rhymes with something common"
+        ]
+
+    # Send to all clients
+    drawer_name = "Groq-AI" if drawer == "groq" else "Router-AI"
+    payload = json.dumps({
+        "sender": drawer_name,
+        "message": f'__SCRIBBLE__:{json.dumps({"event": "ai_draw_start", "word": word, "clues": clues, "drawer": drawer})}',
+        "image": None,
+        "room": room
+    })
+    for conn in list(manager.rooms.get(room, [])):
+        try:
+            await conn.send_text(payload)
+        except Exception:
+            pass
+
 
 # ── WebSocket endpoint ─────────────────────────────────────────
 
@@ -578,7 +683,21 @@ async def ws_endpoint(ws: WebSocket, room: str, username: str):
                     scribble_data = json.loads(msg[len("__SCRIBBLE__:"):])
                     event = scribble_data.get("event", "")
 
-                    if event == "canvas_snapshot":
+                    if event == "game_start":
+                        # Notify AIs about the scribble game
+                        add_history(room, username, "[SCRIBBLE game started! Drawing & guessing game.]")
+                        asyncio.create_task(trigger_ai(room, chain=0, is_game_event=True))
+
+                    elif event == "user_draw_start":
+                        # User is drawing — store word for AI vision guessing
+                        word = scribble_data.get("word", "")
+                        room_game_state[room] = {
+                            "type": "scribble",
+                            "data": {"current_word": word, "drawer": "user"}
+                        }
+                        add_history(room, username, f"[SCRIBBLE: {username} is drawing ({scribble_data.get('wordLength', '?')} letters)]")
+
+                    elif event == "canvas_snapshot":
                         # AI vision guessing — process canvas image
                         canvas_image = scribble_data.get("image", "")
                         hint = scribble_data.get("hint", "")
@@ -588,12 +707,24 @@ async def ws_endpoint(ws: WebSocket, room: str, username: str):
                             asyncio.create_task(
                                 scribble_ai_guess(room, canvas_image, hint, word_length)
                             )
-                    elif event in ("round_start", "round_guessed", "round_timeout", "game_over"):
-                        # Broadcast scribble events to all clients
+
+                    elif event == "ai_draw_request":
+                        # AI's turn to draw — pick word, generate clues
+                        drawer = scribble_data.get("drawer", "groq")
+                        asyncio.create_task(scribble_ai_draw(room, drawer))
+
+                    elif event == "user_guess":
+                        # User guessing during AI draw turn
+                        guess = scribble_data.get("guess", "")
+                        state = room_game_state.get(room, {})
+                        current_word = state.get("data", {}).get("current_word", "")
+                        # Validation is done client-side, log it
+                        add_history(room, username, f'[SCRIBBLE: {username} guessed "{guess}"]')
+
+                    elif event in ("round_guessed", "round_timeout", "game_over"):
                         await manager.broadcast(msg, username, room)
-                        if event in ("round_guessed", "game_over"):
-                            # Trigger AI reaction for notable scribble events
-                            add_history(room, username, f"[SCRIBBLE: {event}]")
+                        add_history(room, username, f"[SCRIBBLE: {event}]")
+                        if event == "game_over":
                             asyncio.create_task(trigger_ai(room, chain=0, is_game_event=True))
                     else:
                         await manager.broadcast(msg, username, room)
