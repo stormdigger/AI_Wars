@@ -5,7 +5,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>AI Squad – Chat + Games</title>
-    <meta name="description" content="AI Squad - Chat with AI bros and play Ludo & Chess together in real-time">
+    <meta name="description"
+        content="AI Squad - Chat with AI bros and play Ludo, Chess & Scribble together in real-time">
     <link
         href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Inter:wght@400;500;600&display=swap"
         rel="stylesheet">
@@ -22,6 +23,7 @@
             <div class="tab-bar">
                 <button class="tab-btn" id="tab-ludo" onclick="switchTab('ludo')">🎲 Ludo</button>
                 <button class="tab-btn" id="tab-chess" onclick="switchTab('chess')">♟ Chess</button>
+                <button class="tab-btn" id="tab-scribble" onclick="switchTab('scribble')">🎨 Scribble</button>
             </div>
         </div>
 
@@ -52,16 +54,14 @@
             <!-- GAME AREA -->
             <div class="game-area" id="game-area">
 
-                <!-- LUDO PANE -->
+                <!-- ═══ LUDO PANE ═══ -->
                 <div class="gpane vis" id="pane-ludo">
-                    <!-- Start screen (shown before game starts) -->
                     <div class="game-start-screen" id="ludo-start-screen">
                         <div class="game-icon">🎲</div>
                         <h2>Ludo</h2>
                         <p>Play Ludo with the AI Squad! You're 🔴 Red, Groq-AI is 🟢 Green, Router-AI is 🔵 Blue.</p>
                         <button class="btn-start-game" onclick="startLudoGame()">Start Ludo →</button>
                     </div>
-                    <!-- Actual game (hidden until start) -->
                     <div id="ludo-game-area" style="display:none;width:100%;">
                         <div class="pane-hdr">
                             <button class="btn-back" onclick="exitGameMode()">← Back</button>
@@ -88,26 +88,23 @@
                                         Again</button>
                                 </div>
                             </div>
-                            <div class="llog" id="llog">Game started! You are 🔴 Red.</div>
+                            <div class="llog" id="llog">Game started!</div>
                         </div>
                     </div>
                 </div>
 
-                <!-- CHESS PANE -->
+                <!-- ═══ CHESS PANE ═══ -->
                 <div class="gpane" id="pane-chess">
-                    <!-- Start screen -->
                     <div class="game-start-screen" id="chess-start-screen">
                         <div class="game-icon">♟️</div>
                         <h2>Chess</h2>
-                        <p>Challenge Groq-AI to a game of Chess! You play White, Groq-AI plays Black with minimax AI.
-                        </p>
+                        <p>Challenge Groq-AI to Chess! You play White, Groq-AI plays Black with minimax AI.</p>
                         <button class="btn-start-game" onclick="startChessGame()">Start Chess →</button>
                     </div>
-                    <!-- Actual game (hidden until start) -->
                     <div id="chess-game-area" style="display:none;width:100%;">
                         <div class="pane-hdr">
                             <button class="btn-back" onclick="exitGameMode()">← Back</button>
-                            <h2>♟ Chess — You (White) vs Groq-AI (Black)</h2>
+                            <h2>♟ Chess — You vs Groq-AI</h2>
                             <button class="bnew" onclick="chessReset()">New Game</button>
                         </div>
                         <div class="chess-wrap">
@@ -140,7 +137,7 @@
                                 </div>
                                 <div class="cbox">
                                     <h3>STATUS</h3>
-                                    <div class="cstatus" id="cstatus">Press Start to play</div>
+                                    <div class="cstatus" id="cstatus">Press Start</div>
                                 </div>
                                 <div class="cbox">
                                     <h3>CAPTURED</h3>
@@ -153,13 +150,79 @@
                                     <h3>MOVES</h3>
                                     <div class="clog" id="clog"></div>
                                 </div>
-                                <button class="bact" onclick="chessUndo()">↩ Undo last move</button>
+                                <button class="bact" onclick="chessUndo()">↩ Undo</button>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <!-- LIVE CHAT OVERLAY (thin strip, for game mode) -->
+                <!-- ═══ SCRIBBLE PANE ═══ -->
+                <div class="gpane" id="pane-scribble">
+                    <div class="game-start-screen" id="scribble-start-screen">
+                        <div class="game-icon">🎨</div>
+                        <h2>Scribble</h2>
+                        <p>Draw a word and let the AIs guess! Pick from 3 words, draw on the canvas, and watch Groq-AI
+                            and Router-AI try to figure it out.</p>
+                        <button class="btn-start-game" onclick="startScribbleGame()">Start Scribble →</button>
+                    </div>
+                    <div id="scribble-game-area" style="display:none;width:100%;position:relative;">
+                        <div class="pane-hdr">
+                            <button class="btn-back" onclick="exitGameMode()">← Back</button>
+                            <h2>🎨 Scribble — Draw & AI Guesses</h2>
+                            <button class="bnew" onclick="scribbleReset()">Quit</button>
+                        </div>
+                        <div class="scribble-layout">
+                            <!-- Top: timer + hint + round -->
+                            <div class="scribble-top">
+                                <div class="scribble-time-txt" id="timer-txt">60s</div>
+                                <div class="scribble-timer-bar">
+                                    <div class="scribble-timer-fill" id="timer-fill"></div>
+                                </div>
+                                <div class="scribble-hint" id="scribble-hint">_ _ _ _ _</div>
+                                <div class="scribble-round" id="scribble-round">Round 1/5</div>
+                            </div>
+
+                            <!-- Canvas -->
+                            <div class="scribble-canvas-wrap">
+                                <canvas id="scribble-canvas"></canvas>
+                            </div>
+
+                            <!-- Toolbar -->
+                            <div id="scribble-toolbar" class="scribble-toolbar"></div>
+
+                            <!-- Scores -->
+                            <div class="scribble-scores">
+                                <div class="sscore-card ss-you">
+                                    <span class="ss-name">👤 You</span>
+                                    <span class="ss-pts" id="ss-you-pts">0</span>
+                                </div>
+                                <div class="sscore-card ss-groq">
+                                    <span class="ss-name">🟢 Groq</span>
+                                    <span class="ss-pts" id="ss-groq-pts">0</span>
+                                </div>
+                                <div class="sscore-card ss-router">
+                                    <span class="ss-name">🔵 Router</span>
+                                    <span class="ss-pts" id="ss-router-pts">0</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Word pick overlay -->
+                        <div class="scribble-word-pick" id="scribble-word-pick">
+                            <h3>Choose a word to draw:</h3>
+                            <div class="word-options" id="word-options"></div>
+                        </div>
+
+                        <!-- Round result overlay -->
+                        <div class="scribble-result" id="scribble-result">
+                            <h3 id="scribble-result-title">🎉 Round Over!</h3>
+                            <p id="scribble-result-text">The word was revealed</p>
+                            <p style="font-size:.75em;color:var(--text2);">Next round starting...</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- LIVE CHAT OVERLAY -->
                 <div class="live-chat-overlay" id="live-chat-overlay">
                     <div class="live-chat-msgs" id="live-chat-msgs"></div>
                     <div class="live-chat-input">
@@ -170,14 +233,13 @@
                 </div>
 
             </div>
-
         </div>
-
     </div>
 
     <script src="js/app.js"></script>
     <script src="games/ludo.js"></script>
     <script src="games/chess.js"></script>
+    <script src="games/scribble.js"></script>
 </body>
 
 </html>

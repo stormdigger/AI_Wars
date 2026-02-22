@@ -6,7 +6,7 @@ let ws = null;
 let myUsername = '';
 let myRoom = '';
 let gameMode = false;
-let currentTab = null;  // null = no game tab selected initially
+let currentTab = null;
 let ludoStarted = false;
 let chessStarted = false;
 
@@ -28,6 +28,7 @@ function joinChat() {
         const d = JSON.parse(e.data);
         if (d.message?.startsWith('__LUDO__:')) { handleLudoSync(d); return; }
         if (d.message?.startsWith('__CHESS__:')) { handleChessSync(d); return; }
+        if (d.message?.startsWith('__SCRIBBLE__:')) { handleScribbleMsg(d); return; }
         appendMsg(d.sender, d.message, d.image);
         appendLiveMsg(d.sender, d.message);
     };
@@ -38,7 +39,7 @@ function joinChat() {
     };
 }
 
-// ── Start game functions (called from start screens) ──
+// ── Start game functions ──
 function startLudoGame() {
     if (!myUsername) { alert('Join a room first!'); return; }
     document.getElementById('ludo-start-screen').style.display = 'none';
@@ -90,6 +91,7 @@ function wsSend(obj) {
 // ── Append message to main chat ──
 function appendMsg(sender, text, image) {
     const box = document.getElementById('chat-msgs');
+    if (!box) return;
     const w = document.createElement('div');
 
     if (sender === 'System') {
@@ -139,6 +141,7 @@ function appendMsg(sender, text, image) {
 
 function appendGameMsg(txt) {
     const box = document.getElementById('chat-msgs');
+    if (!box) return;
     const d = document.createElement('div');
     d.className = 'mgame';
     d.textContent = '🎮 ' + txt;
@@ -179,10 +182,7 @@ function appendLiveMsg(sender, text) {
     msg.appendChild(document.createTextNode(' ' + (text || '')));
     box.appendChild(msg);
 
-    while (box.children.length > 15) {
-        box.removeChild(box.firstChild);
-    }
-
+    while (box.children.length > 15) box.removeChild(box.firstChild);
     box.scrollTop = box.scrollHeight;
 }
 
@@ -190,22 +190,18 @@ function appendLiveMsg(sender, text) {
 function switchTab(tab) {
     currentTab = tab;
 
-    // Update tab button styles
     document.getElementById('tab-ludo').classList.toggle('active', tab === 'ludo');
     document.getElementById('tab-chess').classList.toggle('active', tab === 'chess');
+    document.getElementById('tab-scribble').classList.toggle('active', tab === 'scribble');
 
-    // Show the correct pane
     document.getElementById('pane-ludo').classList.toggle('vis', tab === 'ludo');
     document.getElementById('pane-chess').classList.toggle('vis', tab === 'chess');
+    document.getElementById('pane-scribble').classList.toggle('vis', tab === 'scribble');
 
-    // Show game area
     const gameArea = document.getElementById('game-area');
     gameArea.classList.add('active');
 
-    // On mobile, enter game fullscreen mode
-    if (window.innerWidth < 800 && myUsername) {
-        enterGameMode();
-    }
+    if (window.innerWidth < 800 && myUsername) enterGameMode();
 }
 
 // ── Game Fullscreen Mode (mobile) ──
@@ -225,22 +221,18 @@ function exitGameMode() {
     if (window.innerWidth < 800) {
         gameArea.classList.remove('active');
         if (chatPanel) chatPanel.style.display = 'flex';
-
-        // Deselect tab
         currentTab = null;
         document.getElementById('tab-ludo').classList.remove('active');
         document.getElementById('tab-chess').classList.remove('active');
+        document.getElementById('tab-scribble').classList.remove('active');
     }
 }
 
-// ── Handle resize ──
 window.addEventListener('resize', () => {
     if (window.innerWidth >= 800) {
         const gameArea = document.getElementById('game-area');
         const chatPanel = document.querySelector('.chat-panel');
-        if (currentTab) {
-            gameArea.classList.add('active');
-        }
+        if (currentTab) gameArea.classList.add('active');
         if (chatPanel) chatPanel.style.display = 'flex';
         gameMode = false;
     }

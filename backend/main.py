@@ -81,11 +81,11 @@ def add_history(room: str, sender: str, message: str):
 
 
 def is_game_message(msg: str) -> bool:
-    return msg.startswith("__LUDO__:") or msg.startswith("__CHESS__:")
+    return msg.startswith("__LUDO__:") or msg.startswith("__CHESS__:") or msg.startswith("__SCRIBBLE__:")
 
 
 def parse_game_message(msg: str) -> dict | None:
-    for prefix in ["__LUDO__:", "__CHESS__:"]:
+    for prefix in ["__LUDO__:", "__CHESS__:", "__SCRIBBLE__:"]:
         if msg.startswith(prefix):
             try:
                 return {"type": prefix[2:-2].lower(), "data": json.loads(msg[len(prefix):])}
@@ -440,6 +440,103 @@ async def trigger_ai(room: str, chain: int = 0, is_game_event: bool = False):
         await trigger_ai(room, chain + 1, is_game_event=False)
 
 
+# ── Scribble AI Guessing (Vision API) ──────────────────────────
+
+SCRIBBLE_GUESS_PROMPT = """You are playing a drawing guessing game. Look at this drawing and guess what it is.
+The word has {word_length} letters. Current hint: "{hint}"
+Reply with ONLY a single word guess. Nothing else. No punctuation. No explanation. Just the word."""
+
+async def scribble_ai_guess(room: str, canvas_image: str, hint: str, word_length: int):
+    """Send canvas snapshot to vision API for guessing, then broadcast guesses."""
+    api_key = os.getenv("GROQ_API_KEY")
+    if not api_key:
+        return
+
+    prompt = SCRIBBLE_GUESS_PROMPT.format(word_length=word_length, hint=hint)
+
+    # Groq-AI guesses first
+    groq_guess = await _vision_guess(api_key, canvas_image, prompt)
+    if groq_guess and groq_guess.upper() != "SKIP":
+        guess_msg = json.dumps({
+            "sender": "Groq-AI",
+            "message": f'__SCRIBBLE__:{json.dumps({"event": "ai_guess", "guesser": "Groq-AI", "guess": groq_guess})}',
+            "image": None,
+            "room": room
+        })
+        for conn in list(manager.rooms.get(room, [])):
+            try:
+                await conn.send_text(guess_msg)
+            except Exception:
+                pass
+
+    # Router-AI guesses after a delay with a slightly different prompt
+    await asyncio.sleep(random.uniform(1.5, 3.0))
+
+    router_prompt = f"""You're guessing what someone drew. Look at the drawing carefully.
+Word is {word_length} letters. Hint so far: "{hint}"
+Give ONE word guess. Only the word, nothing else."""
+
+    router_guess = await _vision_guess(api_key, canvas_image, router_prompt)
+    if router_guess and router_guess.upper() != "SKIP":
+        # Avoid duplicate guess
+        if router_guess.lower() != (groq_guess or "").lower():
+            guess_msg = json.dumps({
+                "sender": "Router-AI",
+                "message": f'__SCRIBBLE__:{json.dumps({"event": "ai_guess", "guesser": "Router-AI", "guess": router_guess})}',
+                "image": None,
+                "room": room
+            })
+            for conn in list(manager.rooms.get(room, [])):
+                try:
+                    await conn.send_text(guess_msg)
+                except Exception:
+                    pass
+
+
+async def _vision_guess(api_key: str, image_data: str, prompt: str) -> str:
+    """Call Groq Vision API with a canvas image and return a single-word guess."""
+    try:
+        # Build vision message with image
+        messages = [
+            {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": prompt},
+                    {
+                        "type": "image_url",
+                        "image_url": {"url": image_data}
+                    }
+                ]
+            }
+        ]
+
+        async with httpx.AsyncClient() as client:
+            resp = await client.post(
+                "https://api.groq.com/openai/v1/chat/completions",
+                headers={"Authorization": f"Bearer {api_key}"},
+                json={
+                    "model": "llama-3.2-11b-vision-preview",
+                    "messages": messages,
+                    "temperature": 0.5,
+                    "max_tokens": 10,
+                },
+                timeout=15.0,
+            )
+
+        if resp.status_code != 200:
+            return None
+
+        raw = resp.json()["choices"][0]["message"]["content"].strip()
+        # Clean: take only the first word, strip punctuation
+        guess = raw.split()[0] if raw.split() else raw
+        guess = guess.strip(".,!?\"'()[]{}").lower()
+        return guess
+
+    except Exception:
+        return None
+
+
+
 # ── WebSocket endpoint ─────────────────────────────────────────
 
 @app.websocket("/ws/{room}/{username}")
@@ -475,18 +572,44 @@ async def ws_endpoint(ws: WebSocket, room: str, username: str):
                 await manager.broadcast(desc, username, room, image=image)
                 asyncio.create_task(trigger_ai(room, chain=0, is_game_event=False))
 
+            elif msg.startswith("__SCRIBBLE__:"):
+                # Scribble game message
+                try:
+                    scribble_data = json.loads(msg[len("__SCRIBBLE__:"):])
+                    event = scribble_data.get("event", "")
+
+                    if event == "canvas_snapshot":
+                        # AI vision guessing — process canvas image
+                        canvas_image = scribble_data.get("image", "")
+                        hint = scribble_data.get("hint", "")
+                        word_length = scribble_data.get("wordLength", 0)
+
+                        if canvas_image:
+                            asyncio.create_task(
+                                scribble_ai_guess(room, canvas_image, hint, word_length)
+                            )
+                    elif event in ("round_start", "round_guessed", "round_timeout", "game_over"):
+                        # Broadcast scribble events to all clients
+                        await manager.broadcast(msg, username, room)
+                        if event in ("round_guessed", "game_over"):
+                            # Trigger AI reaction for notable scribble events
+                            add_history(room, username, f"[SCRIBBLE: {event}]")
+                            asyncio.create_task(trigger_ai(room, chain=0, is_game_event=True))
+                    else:
+                        await manager.broadcast(msg, username, room)
+                except Exception:
+                    pass
+
             elif is_game_message(msg):
-                # Game state update
+                # Ludo / Chess state update
                 parsed = parse_game_message(msg)
                 update_game_state(room, parsed)
 
                 event = parsed["data"].get("event", "game update") if parsed else "game update"
                 add_history(room, username, f"[{parsed['type'].upper() if parsed else 'GAME'} update: {event}]")
 
-                # Broadcast raw game message so other clients can sync
                 await manager.broadcast(msg, username, room)
 
-                # Only trigger AI for NOTABLE events
                 if parsed and is_notable_game_event(parsed):
                     asyncio.create_task(trigger_ai(room, chain=0, is_game_event=True))
 

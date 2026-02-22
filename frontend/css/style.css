@@ -1,6 +1,6 @@
 /* ══════════════════════════════════════════
    AI SQUAD – STYLE SYSTEM
-   Mobile-first responsive + premium design
+   Mobile-first · Premium Design
    ══════════════════════════════════════════ */
 
 * {
@@ -19,14 +19,19 @@
     --accent2: #e879a0;
     --text: #e0e0f0;
     --text2: #8888b0;
-    --red: #ff4466;
-    --green: #33cc77;
-    --blue: #3377ff;
-    --yellow: #ffbb33;
-    --red-glow: #ff446644;
-    --green-glow: #33cc7744;
-    --blue-glow: #3377ff44;
-    --yellow-glow: #ffbb3344;
+
+    /* Ludo classic colors */
+    --ludo-red: #E53935;
+    --ludo-red-lt: #EF5350;
+    --ludo-green: #43A047;
+    --ludo-green-lt: #66BB6A;
+    --ludo-blue: #1E88E5;
+    --ludo-blue-lt: #42A5F5;
+    --ludo-yellow: #FDD835;
+    --ludo-yellow-lt: #FFEE58;
+    --ludo-white: #f5f0e8;
+    --ludo-bg: #faf6ee;
+
     --cell: min(6.2vw, 38px);
     --chess-cell: min(10.5vw, 60px);
 }
@@ -94,13 +99,13 @@ body {
 }
 
 .tab-btn {
-    padding: 7px 16px;
+    padding: 7px 14px;
     border-radius: 10px;
     border: 1px solid var(--border);
     background: var(--surface3);
     color: var(--text2);
     cursor: pointer;
-    font-size: .82em;
+    font-size: .8em;
     font-weight: 500;
     transition: all .2s;
     white-space: nowrap;
@@ -196,7 +201,6 @@ body {
 .btn-primary:hover {
     opacity: .9;
     transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(124, 106, 247, .4);
 }
 
 /* Chat messages */
@@ -245,10 +249,10 @@ body {
     align-self: center;
     color: var(--text2);
     font-size: .7em;
-    font-style: italic;
     padding: 3px 12px;
     background: var(--surface3);
     border-radius: 20px;
+    font-style: italic;
 }
 
 .mme {
@@ -511,7 +515,7 @@ body {
 .game-start-screen p {
     font-size: .85em;
     color: var(--text2);
-    max-width: 280px;
+    max-width: 300px;
     line-height: 1.5;
 }
 
@@ -535,146 +539,185 @@ body {
     box-shadow: 0 8px 30px rgba(124, 106, 247, .5);
 }
 
-/* ══════════════════════════════
-   PREMIUM LUDO BOARD
-   ══════════════════════════════ */
+/* ══════════════════════════════════════
+   PREMIUM LUDO BOARD – CLASSIC STYLE
+   ══════════════════════════════════════ */
 
 #ludo-board {
     display: grid;
     grid-template-columns: repeat(15, var(--cell));
     grid-template-rows: repeat(15, var(--cell));
-    gap: 1px;
-    background: #060610;
-    border: 3px solid #3a3a65;
-    border-radius: 12px;
-    padding: 3px;
+    gap: 0;
+    background: var(--ludo-bg);
+    border: 3px solid #bba870;
+    border-radius: 10px;
+    padding: 0;
     position: relative;
-    box-shadow:
-        0 0 60px rgba(124, 106, 247, .08),
-        0 0 120px rgba(0, 0, 0, .6),
-        inset 0 0 40px rgba(0, 0, 0, .5);
+    box-shadow: 0 8px 40px rgba(0, 0, 0, .5), 0 0 0 1px #d4c89a;
+    overflow: hidden;
 }
 
 .lc {
     width: var(--cell);
     height: var(--cell);
-    background: #0e0e20;
-    border-radius: 3px;
+    background: var(--ludo-white);
     display: flex;
     align-items: center;
     justify-content: center;
     position: relative;
-    border: 1px solid #ffffff05;
+    border: .5px solid #d8d0c0;
     transition: background .15s;
 }
 
-/* Home yards — rich gradient fills */
+/* Home yards — bright solid fills */
 .lhr {
-    background: linear-gradient(145deg, #ff6688 0%, #cc1140 50%, #990830 100%) !important;
-    border-color: #ff446630;
-    box-shadow: inset 0 0 4px rgba(0, 0, 0, .3);
+    background: var(--ludo-red) !important;
+    border-color: #c62828 !important;
 }
 
 .lhg {
-    background: linear-gradient(145deg, #55dd88 0%, #22aa55 50%, #118838 100%) !important;
-    border-color: #33cc7730;
-    box-shadow: inset 0 0 4px rgba(0, 0, 0, .3);
+    background: var(--ludo-green) !important;
+    border-color: #2E7D32 !important;
 }
 
 .lhb {
-    background: linear-gradient(145deg, #6699ff 0%, #2255dd 50%, #1133aa 100%) !important;
-    border-color: #3377ff30;
-    box-shadow: inset 0 0 4px rgba(0, 0, 0, .3);
+    background: var(--ludo-blue) !important;
+    border-color: #1565C0 !important;
 }
 
 .lhy {
-    background: linear-gradient(145deg, #ffcc55 0%, #cc9922 50%, #aa7711 100%) !important;
-    border-color: #ffbb3330;
-    box-shadow: inset 0 0 4px rgba(0, 0, 0, .3);
+    background: var(--ludo-yellow) !important;
+    border-color: #F9A825 !important;
 }
 
-/* Path cells — subtle dark */
+/* Inner home box (white area with circles) */
+.lhome-inner {
+    position: absolute;
+    background: white;
+    border-radius: 8px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 4%;
+    padding: 8%;
+    box-shadow: inset 0 2px 8px rgba(0, 0, 0, .1);
+}
+
+/* Path cells */
 .lpath {
-    background: #151530 !important;
-    border-color: #ffffff0a;
+    background: var(--ludo-white) !important;
+    border-color: #d0c8b8 !important;
 }
 
-/* Colored starting paths */
+/* Colored entry/start paths */
 .lpr {
-    background: linear-gradient(180deg, #1a0a12, #220e18) !important;
-    border-color: var(--red-glow);
+    background: #ffcdd2 !important;
+    border-color: #ef9a9a !important;
 }
 
 .lpg {
-    background: linear-gradient(180deg, #0a1a10, #0e2215) !important;
-    border-color: var(--green-glow);
+    background: #c8e6c9 !important;
+    border-color: #a5d6a7 !important;
 }
 
 .lpb {
-    background: linear-gradient(180deg, #0a0e1a, #0e1422) !important;
-    border-color: var(--blue-glow);
+    background: #bbdefb !important;
+    border-color: #90caf9 !important;
 }
 
 .lpy {
-    background: linear-gradient(180deg, #1a1508, #22190c) !important;
-    border-color: var(--yellow-glow);
+    background: #fff9c4 !important;
+    border-color: #fff176 !important;
 }
 
-/* Home stretch lanes — glowing paths to center */
+/* Home stretch lanes — bold color fills */
 .lsr {
-    background: linear-gradient(135deg, #3a0810, #5a1020) !important;
-    border-color: var(--red) !important;
-    box-shadow: inset 0 0 8px rgba(255, 68, 102, .15);
+    background: var(--ludo-red) !important;
+    border-color: #c62828 !important;
 }
 
 .lsg {
-    background: linear-gradient(135deg, #083a10, #10501a) !important;
-    border-color: var(--green) !important;
-    box-shadow: inset 0 0 8px rgba(51, 204, 119, .15);
+    background: var(--ludo-green) !important;
+    border-color: #2E7D32 !important;
 }
 
 .lsb {
-    background: linear-gradient(135deg, #08103a, #101850) !important;
-    border-color: var(--blue) !important;
-    box-shadow: inset 0 0 8px rgba(51, 119, 255, .15);
+    background: var(--ludo-blue) !important;
+    border-color: #1565C0 !important;
 }
 
 .lsy {
-    background: linear-gradient(135deg, #2a1e08, #44340c) !important;
-    border-color: var(--yellow) !important;
-    box-shadow: inset 0 0 8px rgba(255, 187, 51, .15);
+    background: var(--ludo-yellow) !important;
+    border-color: #F9A825 !important;
 }
 
-/* Safe star — premium golden glow */
+/* Safe star */
 .lsafe::after {
     content: '★';
     font-size: clamp(7px, 2.2vw, 14px);
-    color: #ffd700;
-    text-shadow: 0 0 6px #ffd70088, 0 0 12px #ffd70044;
+    color: #888;
     position: absolute;
-    filter: drop-shadow(0 0 3px #ffd700);
+    opacity: .6;
 }
 
-/* Center — premium conic gradient with glow */
+/* Colored safe spots — bright */
+.lpr.lsafe::after {
+    color: var(--ludo-red);
+    opacity: 1;
+}
+
+.lpg.lsafe::after {
+    color: var(--ludo-green);
+    opacity: 1;
+}
+
+.lpb.lsafe::after {
+    color: var(--ludo-blue);
+    opacity: 1;
+}
+
+.lpy.lsafe::after {
+    color: var(--ludo-yellow);
+    opacity: 1;
+}
+
+/* Center — conic gradient */
 .lcenter {
-    background: conic-gradient(var(--red) 0deg 90deg,
-            var(--green) 90deg 180deg,
-            var(--blue) 180deg 270deg,
-            var(--yellow) 270deg 360deg) !important;
-    border-radius: 50% !important;
-    border: 3px solid #ffffff30 !important;
-    box-shadow: 0 0 20px #ffffff15, 0 0 40px rgba(124, 106, 247, .15);
+    background: conic-gradient(var(--ludo-red) 0deg 90deg,
+            var(--ludo-green) 90deg 180deg,
+            var(--ludo-blue) 180deg 270deg,
+            var(--ludo-yellow) 270deg 360deg) !important;
+    border: 2px solid #bba870 !important;
+    position: relative;
+    z-index: 2;
 }
 
-/* Home yard circles */
+/* Center triangle overlay */
+.lcenter::after {
+    content: '▲';
+    font-size: clamp(6px, 1.8vw, 12px);
+    color: rgba(255, 255, 255, .6);
+    position: absolute;
+}
+
+/* Home yard inner circles */
 .lcircle::after {
     content: '';
-    width: 60%;
-    height: 60%;
+    width: 62%;
+    height: 62%;
     border-radius: 50%;
-    border: 2px solid rgba(255, 255, 255, .18);
+    border: 2px solid rgba(255, 255, 255, .45);
     position: absolute;
-    box-shadow: inset 0 0 4px rgba(255, 255, 255, .05);
+    background: rgba(255, 255, 255, .15);
+}
+
+/* Entry arrow markers */
+.lentry-arrow::before {
+    content: '▶';
+    font-size: clamp(5px, 1.5vw, 10px);
+    color: rgba(0, 0, 0, .35);
+    position: absolute;
 }
 
 /* ── PREMIUM TOKENS ── */
@@ -683,58 +726,60 @@ body {
     width: clamp(14px, 3.8vw, 24px);
     height: clamp(14px, 3.8vw, 24px);
     border-radius: 50%;
-    border: 2px solid rgba(255, 255, 255, .6);
+    border: 2px solid rgba(255, 255, 255, .8);
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: clamp(5px, 1.5vw, 8px);
+    font-size: clamp(5px, 1.4vw, 8px);
     font-weight: 800;
     color: #fff;
     z-index: 10;
-    transition: all .2s;
-    text-shadow: 0 1px 2px rgba(0, 0, 0, .5);
+    transition: left .4s cubic-bezier(.4, 0, .2, 1), top .4s cubic-bezier(.4, 0, .2, 1);
+    text-shadow: 0 1px 2px rgba(0, 0, 0, .4);
+    cursor: default;
 }
 
 .tok-r {
-    background: radial-gradient(circle at 35% 30%, #ffaabc 0%, #ff4466 50%, #cc1133 100%);
-    box-shadow: 0 2px 8px rgba(255, 68, 102, .5), inset 0 1px 3px rgba(255, 255, 255, .3);
+    background: radial-gradient(circle at 35% 30%, #ff8a80, var(--ludo-red) 60%, #b71c1c);
+    box-shadow: 0 3px 10px rgba(229, 57, 53, .6), inset 0 1px 3px rgba(255, 255, 255, .35);
 }
 
 .tok-g {
-    background: radial-gradient(circle at 35% 30%, #aaffcc 0%, #33cc77 50%, #119944 100%);
-    box-shadow: 0 2px 8px rgba(51, 204, 119, .5), inset 0 1px 3px rgba(255, 255, 255, .3);
+    background: radial-gradient(circle at 35% 30%, #a5d6a7, var(--ludo-green) 60%, #1B5E20);
+    box-shadow: 0 3px 10px rgba(67, 160, 71, .6), inset 0 1px 3px rgba(255, 255, 255, .35);
 }
 
 .tok-b {
-    background: radial-gradient(circle at 35% 30%, #aabbff 0%, #3377ff 50%, #1144cc 100%);
-    box-shadow: 0 2px 8px rgba(51, 119, 255, .5), inset 0 1px 3px rgba(255, 255, 255, .3);
+    background: radial-gradient(circle at 35% 30%, #90caf9, var(--ludo-blue) 60%, #0D47A1);
+    box-shadow: 0 3px 10px rgba(30, 136, 229, .6), inset 0 1px 3px rgba(255, 255, 255, .35);
 }
 
 .tok-y {
-    background: radial-gradient(circle at 35% 30%, #ffe999 0%, #ffbb33 50%, #cc8800 100%);
-    box-shadow: 0 2px 8px rgba(255, 187, 51, .5), inset 0 1px 3px rgba(255, 255, 255, .3);
-    color: #2a1500;
+    background: radial-gradient(circle at 35% 30%, #fff59d, var(--ludo-yellow) 60%, #F57F17);
+    box-shadow: 0 3px 10px rgba(253, 216, 53, .6), inset 0 1px 3px rgba(255, 255, 255, .35);
+    color: #5d4037;
 }
 
 .tok.mov {
-    animation: tpulse .6s infinite alternate;
+    animation: tpulse .55s infinite alternate;
     cursor: pointer;
     border-color: #fff;
     z-index: 20;
-    transform: scale(1.1);
+    transform: scale(1.15);
+    filter: brightness(1.15);
 }
 
 @keyframes tpulse {
     from {
-        box-shadow: 0 0 0 0 rgba(255, 255, 255, .5), 0 2px 8px rgba(0, 0, 0, .5)
+        box-shadow: 0 0 0 0 rgba(255, 255, 255, .6), 0 3px 10px rgba(0, 0, 0, .3)
     }
 
     to {
-        box-shadow: 0 0 0 6px rgba(255, 255, 255, 0), 0 2px 8px rgba(0, 0, 0, .5)
+        box-shadow: 0 0 0 7px rgba(255, 255, 255, 0), 0 3px 10px rgba(0, 0, 0, .3)
     }
 }
 
-/* Ludo controls */
+/* Ludo controls - dark theme */
 .lctrl {
     display: flex;
     gap: 10px;
@@ -755,40 +800,40 @@ body {
 }
 
 .dice {
-    width: 52px;
-    height: 52px;
-    background: linear-gradient(145deg, #2a2a50, #1a1a35);
-    border: 2px solid var(--accent);
-    border-radius: 12px;
+    width: 54px;
+    height: 54px;
+    background: linear-gradient(145deg, #ffffff, #e8e0d0);
+    border: 3px solid #bba870;
+    border-radius: 10px;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 1.8em;
+    font-size: 1.9em;
     cursor: pointer;
     transition: all .2s;
-    box-shadow: 0 4px 16px rgba(124, 106, 247, .3), inset 0 1px 2px rgba(255, 255, 255, .05);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, .3), inset 0 1px 0 rgba(255, 255, 255, .8);
     user-select: none;
     flex-shrink: 0;
+    color: #333;
 }
 
 .dice:hover:not(.doff) {
-    transform: scale(1.08);
-    box-shadow: 0 6px 24px rgba(124, 106, 247, .45);
+    transform: scale(1.1);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, .4);
 }
 
 .dice:active:not(.doff) {
-    transform: scale(.92);
+    transform: scale(.9);
 }
 
 .dice.doff {
-    opacity: .25;
+    opacity: .3;
     cursor: not-allowed;
-    border-color: var(--border);
     box-shadow: none;
 }
 
 .dice.dspin {
-    animation: droll .4s ease;
+    animation: droll .45s ease;
 }
 
 @keyframes droll {
@@ -796,12 +841,16 @@ body {
         transform: rotate(0) scale(1)
     }
 
-    30% {
-        transform: rotate(-25deg) scale(1.25)
+    25% {
+        transform: rotate(-30deg) scale(1.3)
     }
 
-    60% {
-        transform: rotate(20deg) scale(.88)
+    50% {
+        transform: rotate(25deg) scale(.85)
+    }
+
+    75% {
+        transform: rotate(-10deg) scale(1.1)
     }
 
     100% {
@@ -901,9 +950,9 @@ body {
     text-shadow: 0 0 20px rgba(124, 106, 247, .5);
 }
 
-/* ══════════════════════════════
+/* ══════════════════════════════════════
    PREMIUM CHESS BOARD
-   ══════════════════════════════ */
+   ══════════════════════════════════════ */
 
 .chess-wrap {
     display: flex;
@@ -962,7 +1011,6 @@ body {
     box-shadow: 0 8px 40px rgba(0, 0, 0, .6), 0 0 60px rgba(124, 106, 247, .08);
 }
 
-/* Chess cells — elegant dark/light with wood-tone feel */
 .cc {
     width: var(--chess-cell);
     height: var(--chess-cell);
@@ -974,6 +1022,7 @@ body {
     position: relative;
     transition: all .15s;
     user-select: none;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, .6);
 }
 
 .cc.lt {
@@ -1021,11 +1070,6 @@ body {
 
 .cc:hover {
     filter: brightness(1.2);
-}
-
-/* Chess piece styling */
-.cc {
-    text-shadow: 0 2px 4px rgba(0, 0, 0, .6);
 }
 
 .chess-side {
@@ -1207,11 +1251,309 @@ body {
 .pp:hover {
     border-color: var(--accent);
     transform: scale(1.12);
-    box-shadow: 0 4px 12px rgba(124, 106, 247, .3);
 }
 
-/* ══ LIVE CHAT OVERLAY ══
-   Thin strip at bottom, doesn't cover the board much */
+/* ══════════════════════════════════════
+   SCRIBBLE GAME
+   ══════════════════════════════════════ */
+
+.scribble-layout {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 10px;
+    flex: 1;
+}
+
+/* Word choice overlay */
+.scribble-word-pick {
+    position: absolute;
+    inset: 0;
+    background: rgba(5, 5, 12, .95);
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    z-index: 150;
+    backdrop-filter: blur(6px);
+}
+
+.scribble-word-pick.show {
+    display: flex;
+}
+
+.scribble-word-pick h3 {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 1.3em;
+    color: var(--accent);
+}
+
+.word-options {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+
+.word-opt {
+    padding: 12px 24px;
+    background: var(--surface3);
+    border: 2px solid var(--border);
+    border-radius: 12px;
+    color: var(--text);
+    font-size: 1em;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all .2s;
+    font-family: 'Rajdhani', sans-serif;
+    letter-spacing: .5px;
+}
+
+.word-opt:hover {
+    border-color: var(--accent);
+    background: rgba(124, 106, 247, .15);
+    transform: translateY(-3px);
+    box-shadow: 0 6px 20px rgba(124, 106, 247, .3);
+}
+
+/* Top bar: timer + hint + round */
+.scribble-top {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 10px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    flex-shrink: 0;
+}
+
+.scribble-timer-bar {
+    flex: 1;
+    height: 8px;
+    background: var(--surface3);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.scribble-timer-fill {
+    height: 100%;
+    width: 100%;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    border-radius: 4px;
+    transition: width .5s linear;
+}
+
+.scribble-timer-fill.low {
+    background: linear-gradient(90deg, #ff4444, #ff8800);
+}
+
+.scribble-time-txt {
+    font-size: .82em;
+    font-weight: 600;
+    color: var(--text);
+    min-width: 30px;
+    text-align: center;
+    font-family: 'Rajdhani', sans-serif;
+}
+
+.scribble-hint {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 1.1em;
+    letter-spacing: 4px;
+    color: var(--text);
+    font-weight: 600;
+    text-align: center;
+}
+
+.scribble-round {
+    font-size: .72em;
+    color: var(--text2);
+    white-space: nowrap;
+}
+
+/* Canvas area */
+.scribble-canvas-wrap {
+    position: relative;
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, .4);
+    border: 2px solid var(--border);
+    background: #fff;
+    touch-action: none;
+}
+
+.scribble-canvas-wrap canvas {
+    display: block;
+    cursor: crosshair;
+    touch-action: none;
+}
+
+/* Drawing toolbar */
+.scribble-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+    justify-content: center;
+    padding: 8px 10px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    width: 100%;
+}
+
+.scolor-btn {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    border: 2px solid transparent;
+    cursor: pointer;
+    transition: all .15s;
+    flex-shrink: 0;
+}
+
+.scolor-btn:hover {
+    transform: scale(1.15);
+}
+
+.scolor-btn.active {
+    border-color: #fff;
+    transform: scale(1.2);
+    box-shadow: 0 0 8px #fff5;
+}
+
+.stool-sep {
+    width: 1px;
+    height: 24px;
+    background: var(--border);
+    margin: 0 4px;
+}
+
+.ssize-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    background: var(--surface3);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: .15s;
+}
+
+.ssize-btn:hover {
+    border-color: var(--accent);
+}
+
+.ssize-btn.active {
+    border-color: var(--accent);
+    background: rgba(124, 106, 247, .2);
+}
+
+.ssize-dot {
+    border-radius: 50%;
+    background: var(--text);
+}
+
+.stool-btn {
+    padding: 4px 10px;
+    background: var(--surface3);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    cursor: pointer;
+    font-size: .72em;
+    font-weight: 500;
+    transition: .15s;
+    white-space: nowrap;
+}
+
+.stool-btn:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+}
+
+/* Scoreboard */
+.scribble-scores {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    flex-wrap: wrap;
+    width: 100%;
+}
+
+.sscore-card {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    background: var(--surface3);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: .78em;
+    min-width: 100px;
+}
+
+.sscore-card .ss-name {
+    flex: 1;
+    font-weight: 500;
+}
+
+.sscore-card .ss-pts {
+    font-weight: 700;
+    color: var(--accent);
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 1.1em;
+}
+
+.sscore-card.ss-you {
+    border-color: var(--accent);
+}
+
+.sscore-card.ss-groq {
+    border-color: #33cc77;
+}
+
+.sscore-card.ss-router {
+    border-color: #3377ff;
+}
+
+/* Round end overlay */
+.scribble-result {
+    position: absolute;
+    inset: 0;
+    background: rgba(5, 5, 12, .95);
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    z-index: 150;
+    backdrop-filter: blur(6px);
+}
+
+.scribble-result.show {
+    display: flex;
+}
+
+.scribble-result h3 {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 1.3em;
+    color: var(--accent);
+}
+
+.scribble-result p {
+    font-size: .9em;
+    color: var(--text2);
+}
+
+/* ══ LIVE CHAT OVERLAY (thin) ══ */
 .live-chat-overlay {
     position: absolute;
     bottom: 0;
@@ -1322,7 +1664,7 @@ body {
     flex-shrink: 0;
 }
 
-/* ══ DESKTOP LAYOUT ══ */
+/* ══ DESKTOP ══ */
 @media (min-width: 800px) {
     body {
         padding: 16px;
@@ -1368,6 +1710,11 @@ body {
         --cell: 38px;
         --chess-cell: 60px;
     }
+
+    .scribble-canvas-wrap canvas {
+        width: 520px;
+        height: 380px;
+    }
 }
 
 /* ══ MOBILE ══ */
@@ -1404,14 +1751,19 @@ body {
     }
 
     .dice {
-        width: 44px;
-        height: 44px;
-        font-size: 1.5em;
+        width: 46px;
+        height: 46px;
+        font-size: 1.6em;
     }
 
     :root {
         --cell: min(6.2vw, 30px);
         --chess-cell: min(11.5vw, 50px);
+    }
+
+    .scribble-canvas-wrap canvas {
+        width: calc(100vw - 40px);
+        height: calc((100vw - 40px) * 0.73);
     }
 }
 
@@ -1427,8 +1779,8 @@ body {
     }
 
     .tab-btn {
-        padding: 5px 10px;
-        font-size: .75em;
+        padding: 5px 8px;
+        font-size: .72em;
     }
 
     .pane-hdr h2 {

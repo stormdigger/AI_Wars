@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════
-// LUDO ENGINE – Full game logic, rendering, AI
+// LUDO ENGINE – Classic bright board, full logic
 // ═══════════════════════════════════════════
 
 const LT = [ // 52-cell main track [row,col]
@@ -13,26 +13,33 @@ const LT = [ // 52-cell main track [row,col]
     [8, 5], [8, 4], [8, 3], [8, 2], [8, 1], [8, 0], [7, 0]
 ];
 
-const LSTART = { red: 0, green: 13, blue: 26 };
-const LENTRY = { red: 51, green: 12, blue: 25 };
+const LSTART = { red: 0, green: 13, blue: 26, yellow: 39 };
+const LENTRY = { red: 51, green: 12, blue: 25, yellow: 38 };
 
 const LSTRETCH = {
     red: [[7, 1], [7, 2], [7, 3], [7, 4], [7, 5], [7, 6]],
     green: [[1, 7], [2, 7], [3, 7], [4, 7], [5, 7], [6, 7]],
-    blue: [[7, 13], [7, 12], [7, 11], [7, 10], [7, 9], [7, 8]]
+    blue: [[7, 13], [7, 12], [7, 11], [7, 10], [7, 9], [7, 8]],
+    yellow: [[13, 7], [12, 7], [11, 7], [10, 7], [9, 7], [8, 7]]
 };
 
 const LYARD = {
-    red: [[1, 1], [2, 1], [1, 2], [2, 2]],
-    green: [[1, 12], [2, 12], [1, 13], [2, 13]],
-    blue: [[12, 12], [13, 12], [12, 13], [13, 13]]
+    red: [[2, 2], [2, 4], [4, 2], [4, 4]],
+    green: [[2, 10], [2, 12], [4, 10], [4, 12]],
+    blue: [[10, 10], [10, 12], [12, 10], [12, 12]],
+    yellow: [[10, 2], [10, 4], [12, 2], [12, 4]]
 };
 
 const LSAFE = [0, 8, 13, 21, 26, 34, 39, 47];
 const DF = ['⚀', '⚁', '⚂', '⚃', '⚄', '⚅'];
-const LCOLORS = ['red', 'green', 'blue'];
-const LCOL = { red: 'var(--red)', green: 'var(--green)', blue: 'var(--blue)' };
-const LEMOJI = { red: '🔴', green: '🟢', blue: '🔵' };
+const LCOLORS = ['red', 'green', 'blue'];  // playable colors (yellow is cosmetic yard only)
+const LCOL = {
+    red: 'var(--ludo-red)',
+    green: 'var(--ludo-green)',
+    blue: 'var(--ludo-blue)',
+    yellow: 'var(--ludo-yellow)'
+};
+const LEMOJI = { red: '🔴', green: '🟢', blue: '🔵', yellow: '🟡' };
 
 let ludo = {
     pos: { red: [-1, -1, -1, -1], green: [-1, -1, -1, -1], blue: [-1, -1, -1, -1] },
@@ -40,12 +47,12 @@ let ludo = {
 };
 let lAiTimer = null;
 
-// ── Core helpers ──
+// ── Helpers ──
 function lAbsIdx(c, rel) { return (LSTART[c] + rel) % 52; }
 
 function lCoord(c, pos) {
     if (pos === -1) return null;
-    if (pos === 200) return [7, 7];
+    if (pos === 200) return [7, 7]; // center
     if (pos >= 100) return LSTRETCH[c][pos - 100];
     return LT[lAbsIdx(c, pos)];
 }
@@ -100,7 +107,9 @@ function lDescPos(c, p) {
 // ── Board build ──
 function ludoBuildBoard() {
     const bd = document.getElementById('ludo-board');
+    if (!bd) return;
     bd.innerHTML = '';
+
     for (let r = 0; r < 15; r++) {
         for (let c = 0; c < 15; c++) {
             const el = document.createElement('div');
@@ -109,39 +118,55 @@ function ludoBuildBoard() {
             bd.appendChild(el);
         }
     }
-    lZone(0, 0, 5, 5, 'lhr');
-    lZone(0, 9, 5, 14, 'lhg');
-    lZone(9, 9, 14, 14, 'lhb');
-    lZone(9, 0, 14, 5, 'lhy');
 
-    // Home circles
-    [[1, 1], [1, 2], [2, 1], [2, 2], [1, 12], [1, 13], [2, 12], [2, 13],
-    [12, 12], [12, 13], [13, 12], [13, 13], [12, 1], [12, 2], [13, 1], [13, 2]]
-        .forEach(([r, c]) => lc(r, c).classList.add('lcircle'));
+    // Home yards (6x6 corner blocks)
+    lZone(0, 0, 5, 5, 'lhr');     // Red top-left → actually Yellow in classic
+    lZone(0, 9, 5, 14, 'lhg');    // Green top-right
+    lZone(9, 9, 14, 14, 'lhb');   // Blue bottom-right
+    lZone(9, 0, 14, 5, 'lhy');    // Yellow bottom-left
 
+    // Inner white boxes with token circles
+    [[1, 1, 4, 4, 'lhr'], [1, 10, 4, 13, 'lhg'],
+    [10, 10, 13, 13, 'lhb'], [10, 1, 13, 4, 'lhy']].forEach(([r1, c1, r2, c2]) => {
+        // circles at token spots
+        const spots = [
+            [r1, c1], [r1, c2], [r2, c1], [r2, c2]
+        ];
+        spots.forEach(([sr, sc]) => {
+            const cell = lc(sr, sc);
+            if (cell) cell.classList.add('lcircle');
+        });
+    });
+
+    // Path cells
     LT.forEach(([r, c]) => lc(r, c).classList.add('lpath'));
 
-    // Color paths
-    for (let i = 1; i <= 5; i++) lc(6, i).classList.add('lpr');
-    for (let i = 1; i <= 5; i++) lc(i, 8).classList.add('lpg');
-    for (let i = 9; i <= 13; i++) lc(8, i).classList.add('lpb');
-    for (let i = 9; i <= 13; i++) lc(i, 6).classList.add('lpy');
+    // Colored entry/starting paths
+    for (let i = 1; i <= 5; i++) lc(6, i)?.classList.add('lpr');  // Red column
+    for (let i = 1; i <= 5; i++) lc(i, 8)?.classList.add('lpg');  // Green row
+    for (let i = 9; i <= 13; i++) lc(8, i)?.classList.add('lpb'); // Blue column
+    for (let i = 9; i <= 13; i++) lc(i, 6)?.classList.add('lpy'); // Yellow row
 
-    // Home stretches
-    LSTRETCH.red.forEach(([r, c]) => lc(r, c).classList.add('lsr'));
-    LSTRETCH.green.forEach(([r, c]) => lc(r, c).classList.add('lsg'));
-    LSTRETCH.blue.forEach(([r, c]) => lc(r, c).classList.add('lsb'));
+    // Home stretch lanes
+    LSTRETCH.red.forEach(([r, c]) => lc(r, c)?.classList.add('lsr'));
+    LSTRETCH.green.forEach(([r, c]) => lc(r, c)?.classList.add('lsg'));
+    LSTRETCH.blue.forEach(([r, c]) => lc(r, c)?.classList.add('lsb'));
+    LSTRETCH.yellow.forEach(([r, c]) => lc(r, c)?.classList.add('lsy'));
 
     // Safe stars
-    LSAFE.forEach(i => { const [r, c] = LT[i]; lc(r, c).classList.add('lsafe'); });
+    LSAFE.forEach(i => { const [r, c] = LT[i]; lc(r, c)?.classList.add('lsafe'); });
 
     // Center
-    lc(7, 7).classList.add('lcenter');
+    lc(7, 7)?.classList.add('lcenter');
 
-    // Starting cells
-    lc(6, 1).classList.add('lpr');
-    lc(0, 8).classList.add('lpg');
-    lc(8, 13).classList.add('lpb');
+    // Starting cells with arrows
+    [[6, 1, 'lpr'], [0, 8, 'lpg'], [8, 13, 'lpb'], [14, 6, 'lpy']].forEach(([r, c, cls]) => {
+        const cell = lc(r, c);
+        if (cell) {
+            cell.classList.add(cls);
+            cell.classList.add('lentry-arrow');
+        }
+    });
 }
 
 function lc(r, c) { return document.getElementById(`lc${r}-${c}`); }
@@ -178,10 +203,10 @@ function lRenderTokens() {
 
             // Offset for stacking
             const cellSize = cell.offsetWidth || 24;
-            const ofs = Math.max(4, cellSize * 0.2);
-            const ox = [-ofs, ofs, -ofs, ofs][idx];
-            const oy = [-ofs, -ofs, ofs, ofs][idx];
-            const base = Math.max(2, (cellSize - (cellSize * 0.6)) / 2);
+            const ofs = Math.max(3, cellSize * 0.18);
+            const offsets = [[-ofs, -ofs], [ofs, -ofs], [-ofs, ofs], [ofs, ofs]];
+            const [ox, oy] = offsets[idx] || [0, 0];
+            const base = Math.max(1, (cellSize - (cellSize * 0.6)) / 2);
             tok.style.left = `${base + ox}px`;
             tok.style.top = `${base + oy}px`;
 
@@ -202,6 +227,7 @@ function lRenderTokens() {
 // ── UI helpers ──
 function lUpdateDots() {
     const el = document.getElementById('tdots');
+    if (!el) return;
     el.innerHTML = '';
     for (const c of LCOLORS) {
         const d = document.createElement('div');
@@ -212,16 +238,17 @@ function lUpdateDots() {
     }
 }
 
-function lSetStat(msg) { document.getElementById('lstat').textContent = msg; }
+function lSetStat(msg) { const el = document.getElementById('lstat'); if (el) el.textContent = msg; }
 
 function lLog(msg) {
     const el = document.getElementById('llog');
+    if (!el) return;
     el.innerHTML += msg + '<br>';
     el.scrollTop = el.scrollHeight;
 }
 
 function lDiceEl() { return document.getElementById('ldice'); }
-function lSetDice(on) { lDiceEl().classList.toggle('doff', !on); }
+function lSetDice(on) { const d = lDiceEl(); if (d) d.classList.toggle('doff', !on); }
 
 // ── Roll dice ──
 function ludoRoll() {
@@ -234,7 +261,7 @@ function ludoRoll() {
     const d = lDiceEl();
     d.classList.add('dspin');
     d.textContent = DF[val - 1];
-    setTimeout(() => d.classList.remove('dspin'), 400);
+    setTimeout(() => d.classList.remove('dspin'), 450);
 
     lLog(`🎲 ${myUsername} rolled ${val}`);
     ludo.movable = lMovable('red', val);
@@ -245,18 +272,14 @@ function ludoRoll() {
     } else if (ludo.movable.length === 1) {
         setTimeout(() => lPlayerMove(ludo.movable[0]), 550);
     } else {
-        lSetStat('Click a glowing token!');
+        lSetStat('Tap a glowing token!');
         lRenderTokens();
     }
 
     lSetDice(false);
 
-    // Broadcast — notable events only
-    if (val === 6) {
-        lBroadcast(`${myUsername} rolled 6! 🔥`);
-    } else {
-        lBroadcastQuiet(`${myUsername} rolled ${val}`);
-    }
+    if (val === 6) lBroadcast(`${myUsername} rolled 6! 🔥`);
+    else lBroadcastQuiet(`${myUsername} rolled ${val}`);
 }
 
 // ── Player move ──
@@ -269,15 +292,9 @@ function lPlayerMove(ti) {
 
     lLog(`🔴 Token ${ti + 1}: ${lDescPos('red', old)} → ${lDescPos('red', newPos)}`);
 
-    // Determine if notable
-    const wasCapture = old !== -1 && newPos !== old; // capture is detected in lDoMove via lCheckCapture
-    if (newPos === 200) {
-        lBroadcast(`${myUsername}'s token ${ti + 1} reached GOAL! 🎯`);
-    } else if (newPos >= 100 && old < 100) {
-        lBroadcast(`${myUsername}'s token entered home stretch!`);
-    } else {
-        lBroadcastQuiet(`${myUsername} moved token ${ti + 1}`);
-    }
+    if (newPos === 200) lBroadcast(`${myUsername}'s token ${ti + 1} reached GOAL! 🎯`);
+    else if (newPos >= 100 && old < 100) lBroadcast(`${myUsername}'s token entered home stretch!`);
+    else lBroadcastQuiet(`${myUsername} moved token ${ti + 1}`);
 
     if (lWon('red')) { lSetWinner('red'); return; }
     lNextTurn(ludo.dice === 6);
@@ -288,7 +305,8 @@ function lNextTurn(extra) {
     ludo.rolled = false;
     ludo.movable = [];
     ludo.dice = null;
-    lDiceEl().textContent = '🎲';
+    const d = lDiceEl();
+    if (d) d.textContent = '🎲';
 
     if (!extra) {
         const i = LCOLORS.indexOf(ludo.turn);
@@ -320,9 +338,7 @@ function lAiTurn(color) {
     ludo.rolled = true;
 
     const d = lDiceEl();
-    d.textContent = DF[val - 1];
-    d.classList.add('dspin');
-    setTimeout(() => d.classList.remove('dspin'), 400);
+    if (d) { d.textContent = DF[val - 1]; d.classList.add('dspin'); setTimeout(() => d.classList.remove('dspin'), 400); }
 
     const nm = { green: 'Groq-AI', blue: 'Router-AI' }[color];
     lLog(`🎲 ${nm} rolled ${val}`);
@@ -340,19 +356,12 @@ function lAiTurn(color) {
             const old = ludo.pos[color][ti];
             lDoMove(color, ti, val);
             const newPos = ludo.pos[color][ti];
-
             lLog(`${LEMOJI[color]} ${nm} token ${ti + 1}: ${lDescPos(color, old)} → ${lDescPos(color, newPos)}`);
 
-            // Determine notability for AI moves
-            if (val === 6) {
-                lBroadcast(`${nm} rolled 6! 🔥`);
-            } else if (newPos === 200) {
-                lBroadcast(`${nm}'s token reached GOAL! 🎯`);
-            } else if (newPos >= 100 && old < 100) {
-                lBroadcast(`${nm}'s token entered home stretch!`);
-            } else {
-                lBroadcastQuiet(`${nm} rolled ${val}, moved token ${ti + 1}`);
-            }
+            if (val === 6) lBroadcast(`${nm} rolled 6! 🔥`);
+            else if (newPos === 200) lBroadcast(`${nm}'s token reached GOAL! 🎯`);
+            else if (newPos >= 100 && old < 100) lBroadcast(`${nm}'s token entered home stretch!`);
+            else lBroadcastQuiet(`${nm} rolled ${val}, moved token ${ti + 1}`);
 
             if (lWon(color)) { lSetWinner(color); return; }
             lNextTurn(val === 6);
@@ -393,9 +402,12 @@ function lAiChoose(color, mv, dice) {
 function lSetWinner(color) {
     ludo.winner = color;
     const nm = { red: myUsername || 'You', green: 'Groq-AI', blue: 'Router-AI' }[color];
-    document.getElementById('wemoji').textContent = LEMOJI[color];
-    document.getElementById('wtext').textContent = `${nm} WINS!`;
-    document.getElementById('ludo-winner').classList.add('show');
+    const we = document.getElementById('wemoji');
+    const wt = document.getElementById('wtext');
+    const wo = document.getElementById('ludo-winner');
+    if (we) we.textContent = LEMOJI[color];
+    if (wt) wt.textContent = `${nm} WINS!`;
+    if (wo) wo.classList.add('show');
     lLog(`🏆 ${nm} wins!`);
     lBroadcast(`${nm} WON Ludo! 🏆`);
     lSetDice(false);
@@ -404,11 +416,10 @@ function lSetWinner(color) {
 // ── Broadcasting ──
 function lBuildSummary() {
     return LCOLORS.map(c =>
-        `${c}:[${ludo.pos[c].map((p, i) => lDescPos(c, p)).join(',')}]`
+        `${c}:[${ludo.pos[c].map((p) => lDescPos(c, p)).join(',')}]`
     ).join(' ');
 }
 
-// Notable broadcast — triggers AI chat
 function lBroadcast(event) {
     if (!ws || ws.readyState !== 1) return;
     wsSend({
@@ -422,7 +433,6 @@ function lBroadcast(event) {
     appendGameMsg(event);
 }
 
-// Quiet broadcast — syncs state but won't trigger AI chat (no notable keywords)
 function lBroadcastQuiet(event) {
     if (!ws || ws.readyState !== 1) return;
     wsSend({
@@ -433,7 +443,6 @@ function lBroadcastQuiet(event) {
         })}`,
         image: null
     });
-    // Still show in local game log
     appendGameMsg(event);
 }
 
@@ -452,7 +461,8 @@ function ludoStart() {
     lUpdateDots();
     lSetDice(true);
     lSetStat('Your turn — roll the dice!');
-    document.getElementById('llog').textContent = 'Game started! You are 🔴 Red.';
+    const el = document.getElementById('llog');
+    if (el) el.textContent = 'Game started! You are 🔴 Red.';
 }
 
 function ludoReset() {
@@ -462,9 +472,12 @@ function ludoReset() {
         turn: 'red', dice: null, rolled: false, movable: [], winner: null,
         started: !!myUsername
     };
-    document.getElementById('ludo-winner').classList.remove('show');
-    lDiceEl().textContent = '🎲';
-    document.getElementById('llog').textContent = 'New game started!';
+    const wo = document.getElementById('ludo-winner');
+    if (wo) wo.classList.remove('show');
+    const d = lDiceEl();
+    if (d) d.textContent = '🎲';
+    const log = document.getElementById('llog');
+    if (log) log.textContent = 'New game started!';
     ludoBuildBoard();
     lRenderTokens();
     lUpdateDots();
@@ -478,4 +491,4 @@ function ludoReset() {
     }
 }
 
-// Board is built when ludoStart() is called from the start screen
+// Board is built when ludoStart() is called from start screen
