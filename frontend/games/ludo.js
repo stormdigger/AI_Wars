@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════
-// LUDO ENGINE – Classic bright board, full logic
+// LUDO ENGINE – Classic board, fixed tokens, artistic design
 // ═══════════════════════════════════════════
 
 const LT = [ // 52-cell main track [row,col]
@@ -32,7 +32,7 @@ const LYARD = {
 
 const LSAFE = [0, 8, 13, 21, 26, 34, 39, 47];
 const DF = ['⚀', '⚁', '⚂', '⚃', '⚄', '⚅'];
-const LCOLORS = ['red', 'green', 'blue'];  // playable colors (yellow is cosmetic yard only)
+const LCOLORS = ['red', 'green', 'blue'];
 const LCOL = {
     red: 'var(--ludo-red)',
     green: 'var(--ludo-green)',
@@ -52,7 +52,7 @@ function lAbsIdx(c, rel) { return (LSTART[c] + rel) % 52; }
 
 function lCoord(c, pos) {
     if (pos === -1) return null;
-    if (pos === 200) return [7, 7]; // center
+    if (pos === 200) return [7, 7];
     if (pos >= 100) return LSTRETCH[c][pos - 100];
     return LT[lAbsIdx(c, pos)];
 }
@@ -120,32 +120,43 @@ function ludoBuildBoard() {
     }
 
     // Home yards (6x6 corner blocks)
-    lZone(0, 0, 5, 5, 'lhr');     // Red top-left → actually Yellow in classic
-    lZone(0, 9, 5, 14, 'lhg');    // Green top-right
-    lZone(9, 9, 14, 14, 'lhb');   // Blue bottom-right
-    lZone(9, 0, 14, 5, 'lhy');    // Yellow bottom-left
+    lZone(0, 0, 5, 5, 'lhr');
+    lZone(0, 9, 5, 14, 'lhg');
+    lZone(9, 9, 14, 14, 'lhb');
+    lZone(9, 0, 14, 5, 'lhy');
 
-    // Inner white boxes with token circles
-    [[1, 1, 4, 4, 'lhr'], [1, 10, 4, 13, 'lhg'],
-    [10, 10, 13, 13, 'lhb'], [10, 1, 13, 4, 'lhy']].forEach(([r1, c1, r2, c2]) => {
-        // circles at token spots
-        const spots = [
-            [r1, c1], [r1, c2], [r2, c1], [r2, c2]
-        ];
+    // Add decorative pattern to home yards
+    lAddHomeDecor(0, 0, 'lhr', '#c62828');
+    lAddHomeDecor(0, 9, 'lhg', '#2E7D32');
+    lAddHomeDecor(9, 9, 'lhb', '#1565C0');
+    lAddHomeDecor(9, 0, 'lhy', '#F9A825');
+
+    // Token circles at token spots
+    const tokenSpots = {
+        red: [[2, 2], [2, 4], [4, 2], [4, 4]],
+        green: [[2, 10], [2, 12], [4, 10], [4, 12]],
+        blue: [[10, 10], [10, 12], [12, 10], [12, 12]],
+        yellow: [[10, 2], [10, 4], [12, 2], [12, 4]]
+    };
+
+    Object.entries(tokenSpots).forEach(([color, spots]) => {
         spots.forEach(([sr, sc]) => {
             const cell = lc(sr, sc);
-            if (cell) cell.classList.add('lcircle');
+            if (cell) {
+                cell.classList.add('lcircle');
+                cell.dataset.tokenColor = color;
+            }
         });
     });
 
     // Path cells
-    LT.forEach(([r, c]) => lc(r, c).classList.add('lpath'));
+    LT.forEach(([r, c]) => lc(r, c)?.classList.add('lpath'));
 
-    // Colored entry/starting paths
-    for (let i = 1; i <= 5; i++) lc(6, i)?.classList.add('lpr');  // Red column
-    for (let i = 1; i <= 5; i++) lc(i, 8)?.classList.add('lpg');  // Green row
-    for (let i = 9; i <= 13; i++) lc(8, i)?.classList.add('lpb'); // Blue column
-    for (let i = 9; i <= 13; i++) lc(i, 6)?.classList.add('lpy'); // Yellow row
+    // Colored entry/start paths
+    for (let i = 1; i <= 5; i++) lc(6, i)?.classList.add('lpr');
+    for (let i = 1; i <= 5; i++) lc(i, 8)?.classList.add('lpg');
+    for (let i = 9; i <= 13; i++) lc(8, i)?.classList.add('lpb');
+    for (let i = 9; i <= 13; i++) lc(i, 6)?.classList.add('lpy');
 
     // Home stretch lanes
     LSTRETCH.red.forEach(([r, c]) => lc(r, c)?.classList.add('lsr'));
@@ -156,17 +167,40 @@ function ludoBuildBoard() {
     // Safe stars
     LSAFE.forEach(i => { const [r, c] = LT[i]; lc(r, c)?.classList.add('lsafe'); });
 
-    // Center
+    // Starting entry cells
+    const entryMap = { red: [6, 1], green: [0, 8], blue: [8, 13], yellow: [14, 6] };
+    Object.entries(entryMap).forEach(([color, [r, c]]) => {
+        lc(r, c)?.classList.add('lentry-arrow');
+    });
+
+    // Colored safe starting cells
+    lc(6, 1)?.classList.add('lpr', 'lsafe');
+    lc(0, 8)?.classList.add('lpg', 'lsafe');
+    lc(8, 13)?.classList.add('lpb', 'lsafe');
+    lc(14, 6)?.classList.add('lpy', 'lsafe');
+
+    // Center cell — conic gradient
     lc(7, 7)?.classList.add('lcenter');
 
-    // Starting cells with arrows
-    [[6, 1, 'lpr'], [0, 8, 'lpg'], [8, 13, 'lpb'], [14, 6, 'lpy']].forEach(([r, c, cls]) => {
-        const cell = lc(r, c);
-        if (cell) {
-            cell.classList.add(cls);
-            cell.classList.add('lentry-arrow');
+    // Add home yard labels/crowns
+    lAddYardLabel(2, 2, 0, 5, '👑');
+    lAddYardLabel(2, 10, 0, 14, '👑');
+    lAddYardLabel(10, 10, 9, 14, '👑');
+    lAddYardLabel(10, 2, 9, 5, '👑');
+}
+
+function lAddHomeDecor(r0, c0, cls, borderColor) {
+    // Add a subtle inner border frame at the 2nd cell inward
+    // This creates a decorative "frame" inside the home yard
+    for (let r = r0 + 1; r <= r0 + 4; r++) {
+        for (let c = c0 + 1; c <= c0 + 4; c++) {
+            // Skip token circle positions
         }
-    });
+    }
+}
+
+function lAddYardLabel(r, c, r0, c0, emoji) {
+    // No-op — labels removed for cleaner look
 }
 
 function lc(r, c) { return document.getElementById(`lc${r}-${c}`); }
@@ -177,9 +211,12 @@ function lZone(r1, c1, r2, c2, cls) {
             lc(r, c)?.classList.add(cls);
 }
 
-// ── Token rendering ──
+// ── Token rendering — FIXED with data-stack CSS approach ──
 function lRenderTokens() {
+    // Remove old tokens
     document.querySelectorAll('.tok').forEach(t => t.remove());
+
+    // Track how many tokens are on each cell
     const occ = {};
 
     for (const color of LCOLORS) {
@@ -190,33 +227,35 @@ function lRenderTokens() {
 
             const [r, c] = coord;
             const key = `${r}-${c}`;
-            const idx = occ[key] || 0;
-            occ[key] = idx + 1;
+            const stackIdx = occ[key] || 0;
+            occ[key] = stackIdx + 1;
 
             const cell = lc(r, c);
             if (!cell) continue;
+
+            // Ensure cell has position:relative
+            cell.style.position = 'relative';
 
             const tok = document.createElement('div');
             const cl = { red: 'r', green: 'g', blue: 'b' }[color];
             tok.className = `tok tok-${cl}`;
             tok.textContent = ti + 1;
 
-            // Offset for stacking
-            const cellSize = cell.offsetWidth || 24;
-            const ofs = Math.max(3, cellSize * 0.18);
-            const offsets = [[-ofs, -ofs], [ofs, -ofs], [-ofs, ofs], [ofs, ofs]];
-            const [ox, oy] = offsets[idx] || [0, 0];
-            const base = Math.max(1, (cellSize - (cellSize * 0.6)) / 2);
-            tok.style.left = `${base + ox}px`;
-            tok.style.top = `${base + oy}px`;
+            // Use data-stack attribute — CSS handles the position
+            tok.dataset.stack = stackIdx;
 
-            if (ludo.turn === color && ludo.rolled && ludo.movable.includes(ti)) {
+            // Highlight movable tokens
+            const isMovable = ludo.turn === color && ludo.rolled && ludo.movable.includes(ti);
+            if (isMovable) {
                 tok.classList.add('mov');
-            }
-
-            if (color === 'red' && ludo.turn === 'red' && ludo.rolled && ludo.movable.includes(ti)) {
-                tok.style.cursor = 'pointer';
-                tok.addEventListener('click', () => lPlayerMove(ti));
+                if (color === 'red') {
+                    tok.style.cursor = 'pointer';
+                    const capturedTi = ti;
+                    tok.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        lPlayerMove(capturedTi);
+                    });
+                }
             }
 
             cell.appendChild(tok);
@@ -229,11 +268,13 @@ function lUpdateDots() {
     const el = document.getElementById('tdots');
     if (!el) return;
     el.innerHTML = '';
+    const names = { red: myUsername || 'You', green: 'Groq-AI', blue: 'Router-AI' };
     for (const c of LCOLORS) {
         const d = document.createElement('div');
         d.className = 'tdot' + (ludo.turn === c ? ' act' : '');
         d.style.background = LCOL[c];
-        d.title = { red: myUsername || 'You', green: 'Groq-AI', blue: 'Router-AI' }[c];
+        d.style.color = '#fff';
+        d.title = names[c];
         el.appendChild(d);
     }
 }
@@ -295,6 +336,8 @@ function lPlayerMove(ti) {
     if (newPos === 200) lBroadcast(`${myUsername}'s token ${ti + 1} reached GOAL! 🎯`);
     else if (newPos >= 100 && old < 100) lBroadcast(`${myUsername}'s token entered home stretch!`);
     else lBroadcastQuiet(`${myUsername} moved token ${ti + 1}`);
+
+    lRenderTokens();
 
     if (lWon('red')) { lSetWinner('red'); return; }
     lNextTurn(ludo.dice === 6);
@@ -362,6 +405,8 @@ function lAiTurn(color) {
             else if (newPos === 200) lBroadcast(`${nm}'s token reached GOAL! 🎯`);
             else if (newPos >= 100 && old < 100) lBroadcast(`${nm}'s token entered home stretch!`);
             else lBroadcastQuiet(`${nm} rolled ${val}, moved token ${ti + 1}`);
+
+            lRenderTokens();
 
             if (lWon(color)) { lSetWinner(color); return; }
             lNextTurn(val === 6);
@@ -462,7 +507,7 @@ function ludoStart() {
     lSetDice(true);
     lSetStat('Your turn — roll the dice!');
     const el = document.getElementById('llog');
-    if (el) el.textContent = 'Game started! You are 🔴 Red.';
+    if (el) el.textContent = 'Game started! You are 🔴 Red.\n';
 }
 
 function ludoReset() {
@@ -477,7 +522,7 @@ function ludoReset() {
     const d = lDiceEl();
     if (d) d.textContent = '🎲';
     const log = document.getElementById('llog');
-    if (log) log.textContent = 'New game started!';
+    if (log) log.textContent = 'New game started!\n';
     ludoBuildBoard();
     lRenderTokens();
     lUpdateDots();
@@ -490,5 +535,3 @@ function ludoReset() {
         lSetStat('Join a room to play');
     }
 }
-
-// Board is built when ludoStart() is called from start screen

@@ -63,10 +63,10 @@ manager = ConnectionManager()
 
 room_histories: dict[str, list[dict]] = {}
 room_game_state: dict[str, dict] = {}
-room_bot_last_replied: dict[str, dict] = {}   # tracks per-room which bots replied this cycle
+room_bot_last_replied: dict[str, dict] = {}
 
 MAX_HISTORY = 12
-MAX_CHAIN = 1   # reduced: only 1 AI-to-AI follow-up round (was 2)
+MAX_CHAIN = 1
 
 
 def get_history(room: str) -> list:
@@ -100,7 +100,6 @@ def update_game_state(room: str, parsed: dict):
 
 
 def get_game_context(room: str) -> str:
-    """Build a short game context string injected into AI system prompt."""
     state = room_game_state.get(room)
     if not state:
         return ""
@@ -117,7 +116,6 @@ def get_game_context(room: str) -> str:
 
 
 def sanitize_history_for_ai(room: str) -> list[dict]:
-    """Return history with game state blobs replaced by readable summaries."""
     cleaned = []
     for item in get_history(room):
         msg = item["message"]
@@ -146,18 +144,15 @@ NOTABLE_CHESS_KEYWORDS = [
 
 
 def is_notable_game_event(parsed: dict) -> bool:
-    """Determine if a game event is notable enough to trigger AI chat."""
     if not parsed:
         return False
     data = parsed.get("data", {})
     event = data.get("event", "").lower()
     winner = data.get("winner")
 
-    # Winner is always notable
     if winner:
         return True
 
-    # Check against notable keywords
     gtype = parsed.get("type", "")
     keywords = NOTABLE_LUDO_KEYWORDS if gtype == "ludo" else NOTABLE_CHESS_KEYWORDS
 
@@ -195,7 +190,6 @@ CRITICAL RULES:
 - Do NOT send walls of text — shorter = funnier.
 - NEVER reply to yourself. If the last message is from you, output: SKIP"""
 
-# Separate game-mode prompts — short expressions only
 GROQ_GAME_SYSTEM = """You are Groq-AI watching a live board game with friends.
 React with ONE short expression (max 10 words). Be expressive like a sports commentator.
 Examples: "OH THAT CAPTURE WAS BRUTAL 💀", "SIX AGAIN?! MACHINE 🔥", "wait you're actually winning rn 😭", "nah that's lowkey smart move", "GG well played 👏"
@@ -208,18 +202,15 @@ Output ONLY the expression. No explanations. No questions. If not exciting, outp
 
 
 def last_n_senders(history: list, n: int = 3) -> list[str]:
-    """Get the senders of the last n messages."""
     return [h["sender"] for h in history[-n:]]
 
 
 def bot_just_spoke(bot_name: str, history: list) -> bool:
-    """Check if this bot was the last or second-to-last speaker."""
     recent = last_n_senders(history, 2)
     return bot_name in recent
 
 
 def bot_spoke_consecutively(bot_name: str, history: list) -> bool:
-    """Check if the last 2 messages are both from this bot."""
     if len(history) < 2:
         return False
     return history[-1]["sender"] == bot_name and history[-2]["sender"] == bot_name
@@ -252,11 +243,9 @@ async def fetch_groq(bot_name: str, history: list, game_ctx: str, is_game: bool 
     if not api_key:
         return "SKIP"
 
-    # Don't reply to yourself
     if history and history[-1]["sender"] == bot_name:
         return "SKIP"
 
-    # Don't reply if you just spoke (anti-spam)
     if bot_spoke_consecutively(bot_name, history):
         return "SKIP"
 
@@ -289,15 +278,12 @@ async def fetch_openrouter(bot_name: str, history: list, game_ctx: str, is_game:
     if not api_key:
         return "SKIP"
 
-    # Don't reply to yourself
     if history and history[-1]["sender"] == bot_name:
         return "SKIP"
 
-    # Don't reply if you spoke consecutively
     if bot_spoke_consecutively(bot_name, history):
         return "SKIP"
 
-    # If last 3 messages have 2+ AI messages, hold back
     ai_bots = {"Groq-AI", "Router-AI"}
     recent_senders = last_n_senders(history, 3)
     ai_count = sum(1 for s in recent_senders if s in ai_bots)
@@ -331,7 +317,6 @@ async def fetch_openrouter(bot_name: str, history: list, game_ctx: str, is_game:
                 )
             if resp.status_code == 200:
                 raw = resp.json()["choices"][0]["message"]["content"].strip()
-                # Strip any role prefix
                 for prefix in [f"{bot_name}:", "Router-AI:", "Groq-AI:", "Assistant:"]:
                     if raw.startswith(prefix):
                         raw = raw[len(prefix):].strip()
@@ -372,38 +357,27 @@ async def describe_image(b64: str) -> str:
 # ── AI trigger ────────────────────────────────────────────────
 
 async def trigger_ai(room: str, chain: int = 0, is_game_event: bool = False):
-    """
-    Trigger both AIs to respond.
-    - chain limits AI↔AI depth (max 1 follow-up)
-    - is_game_event uses short expression prompts
-    - Game events never chain (no AI-to-AI on game events)
-    """
     if chain >= MAX_CHAIN:
         return
 
-    # Stagger delays: Groq first, Router second for natural feel
     groq_delay = 2.0 if is_game_event else 1.5
-    router_extra_delay = 1.5  # Router replies ~1.5s after Groq
+    router_extra_delay = 1.5
 
     await asyncio.sleep(groq_delay)
 
     history = sanitize_history_for_ai(room)
     game_ctx = get_game_context(room)
 
-    # For game events, never do AI-to-AI chains
     if is_game_event and chain > 0:
         return
 
-    # ── Fetch Groq first ──
     groq_reply = await fetch_groq("Groq-AI", history, game_ctx, is_game=is_game_event)
     groq_replied = False
 
     if not isinstance(groq_reply, Exception) and not is_skip(groq_reply):
-        # Strip self-reference prefix
         if groq_reply.lower().startswith("groq-ai:"):
             groq_reply = groq_reply[len("groq-ai:"):].strip()
 
-        # Clamp overly long replies
         words = groq_reply.split()
         max_words = 15 if is_game_event else 60
         if len(words) > max_words:
@@ -413,10 +387,8 @@ async def trigger_ai(room: str, chain: int = 0, is_game_event: bool = False):
         add_history(room, "Groq-AI", groq_reply)
         await manager.broadcast(groq_reply, "Groq-AI", room)
 
-    # ── Then Router with extra delay ──
     await asyncio.sleep(router_extra_delay)
 
-    # Re-fetch history since Groq may have added to it
     history = sanitize_history_for_ai(room)
 
     router_reply = await fetch_openrouter("Router-AI", history, game_ctx, is_game=is_game_event)
@@ -435,16 +407,15 @@ async def trigger_ai(room: str, chain: int = 0, is_game_event: bool = False):
         add_history(room, "Router-AI", router_reply)
         await manager.broadcast(router_reply, "Router-AI", room)
 
-    # Allow ONE round of AI↔AI only for normal chat (not game events)
     if (groq_replied or router_replied) and not is_game_event:
         await trigger_ai(room, chain + 1, is_game_event=False)
 
 
 # ── Scribble AI Guessing (Vision API) ──────────────────────────
 
-SCRIBBLE_GUESS_PROMPT = """You are playing a drawing guessing game. Look at this drawing and guess what it is.
+SCRIBBLE_GUESS_PROMPT = """You are playing a drawing guessing game. Look at this drawing carefully.
 The word has {word_length} letters. Current hint: "{hint}"
-Reply with ONLY a single word guess. Nothing else. No punctuation. No explanation. Just the word."""
+Guess what the drawing shows. Reply with ONLY a single word. No punctuation. No explanation."""
 
 async def scribble_ai_guess(room: str, canvas_image: str, hint: str, word_length: int):
     """Send canvas snapshot to vision API for guessing, then broadcast guesses."""
@@ -454,7 +425,6 @@ async def scribble_ai_guess(room: str, canvas_image: str, hint: str, word_length
 
     prompt = SCRIBBLE_GUESS_PROMPT.format(word_length=word_length, hint=hint)
 
-    # Groq-AI guesses first
     groq_guess = await _vision_guess(api_key, canvas_image, prompt)
     if groq_guess and groq_guess.upper() != "SKIP":
         guess_msg = json.dumps({
@@ -469,16 +439,14 @@ async def scribble_ai_guess(room: str, canvas_image: str, hint: str, word_length
             except Exception:
                 pass
 
-    # Router-AI guesses after a delay with a slightly different prompt
-    await asyncio.sleep(random.uniform(1.5, 3.0))
+    await asyncio.sleep(random.uniform(2.0, 4.0))
 
-    router_prompt = f"""You're guessing what someone drew. Look at the drawing carefully.
-Word is {word_length} letters. Hint so far: "{hint}"
-Give ONE word guess. Only the word, nothing else."""
+    router_prompt = f"""Examine this drawing and guess what object or thing it represents.
+It's a {word_length}-letter word. Revealed letters so far: "{hint}"
+Reply with ONE word only — your best guess."""
 
     router_guess = await _vision_guess(api_key, canvas_image, router_prompt)
     if router_guess and router_guess.upper() != "SKIP":
-        # Avoid duplicate guess
         if router_guess.lower() != (groq_guess or "").lower():
             guess_msg = json.dumps({
                 "sender": "Router-AI",
@@ -496,7 +464,6 @@ Give ONE word guess. Only the word, nothing else."""
 async def _vision_guess(api_key: str, image_data: str, prompt: str) -> str:
     """Call Groq Vision API with a canvas image and return a single-word guess."""
     try:
-        # Build vision message with image
         messages = [
             {
                 "role": "user",
@@ -517,26 +484,27 @@ async def _vision_guess(api_key: str, image_data: str, prompt: str) -> str:
                 json={
                     "model": "llama-3.2-11b-vision-preview",
                     "messages": messages,
-                    "temperature": 0.5,
-                    "max_tokens": 10,
+                    "temperature": 0.4,
+                    "max_tokens": 15,
                 },
-                timeout=15.0,
+                timeout=20.0,
             )
 
         if resp.status_code != 200:
+            print(f"Vision API error: {resp.status_code} - {resp.text[:200]}")
             return None
 
         raw = resp.json()["choices"][0]["message"]["content"].strip()
-        # Clean: take only the first word, strip punctuation
         guess = raw.split()[0] if raw.split() else raw
-        guess = guess.strip(".,!?\"'()[]{}").lower()
-        return guess
+        guess = guess.strip(".,!?\"'()[]{}:;").lower()
+        return guess if guess else None
 
-    except Exception:
+    except Exception as e:
+        print(f"Vision guess error: {e}")
         return None
 
 
-# ── Scribble AI Draw Turn (generate clues) ──────────────────────
+# ── Scribble AI Draw Turn (generate stroke commands) ──────────────────────
 
 SCRIBBLE_WORD_BANK = [
     'apple', 'banana', 'car', 'dog', 'elephant', 'fish', 'guitar', 'house',
@@ -563,75 +531,134 @@ SCRIBBLE_WORD_BANK = [
     'cherry', 'lemon', 'strawberry', 'pineapple', 'carrot', 'tomato'
 ]
 
-SCRIBBLE_CLUE_PROMPT = """You are playing a drawing guessing game. You are the DRAWER for the word "{word}".
-You need to give 5 progressive clues to help guessers figure out the word WITHOUT saying the word itself.
-Start vague and get more specific. Do NOT use the word or obvious derivatives.
+# ── Stroke command prompt ──────────────────────────────────────
+SCRIBBLE_STROKE_PROMPT = """You are drawing "{word}" on a 520x380 pixel canvas for a Pictionary-style game.
+Generate canvas drawing commands as a JSON array. Use simple shapes to make it recognizable.
 
-Rules:
-- Each clue should be 3-8 words max
-- Clue 1: Very vague category or feeling
-- Clue 2: Physical attribute or characteristic
-- Clue 3: Where you might find it or how it's used
-- Clue 4: More specific detail
-- Clue 5: Almost a giveaway but still doesn't say the word
+Command types (use exact format):
+- Line segment: {{"t":"l","x1":50,"y1":100,"x2":200,"y2":100,"c":"#333333","w":3}}
+- Circle (hollow): {{"t":"c","x":260,"y":190,"r":60,"c":"#333333","w":3}}
+- Circle (filled): {{"t":"c","x":260,"y":190,"r":60,"c":"#333333","w":2,"fill":"#ffcc00"}}
+- Rectangle (hollow): {{"t":"r","x":100,"y":80,"w":200,"h":150,"c":"#333333","w":2}}
+- Rectangle (filled): {{"t":"r","x":100,"y":80,"w":200,"h":100,"c":"#333333","w":2,"fill":"#88aaff"}}
+- Arc/curve: {{"t":"a","x":260,"y":190,"r":80,"s":0,"e":3.14159,"c":"#333333","w":3}}
+- Bezier curve: {{"t":"b","x1":50,"y1":200,"cx1":130,"cy1":80,"cx2":390,"cy2":80,"x2":470,"y2":200,"c":"#333333","w":3}}
+- Polyline (connected points): {{"t":"p","pts":[[100,200],[150,100],[200,200],[250,100]],"c":"#333333","w":3}}
 
-Reply with EXACTLY 5 lines, one clue per line. Nothing else."""
+Canvas: 520 wide, 380 tall. Center: (260, 190). Leave 20px margins.
+Use 15-30 commands. Think about what "{word}" looks like, break it into simple shapes.
+Use colors where helpful (e.g., green for plants, blue for water, yellow for sun).
+
+Examples for "house": body rectangle, roof triangle (3 lines), door rectangle, window squares.
+Examples for "sun": filled yellow circle in center, 8 lines radiating outward.
+Examples for "cat": oval body, circle head, triangle ears, curved tail line, whisker lines.
+
+Return ONLY a valid JSON array of commands. No explanations, no markdown, just the array."""
+
+
+async def generate_ai_strokes(word: str) -> list:
+    """Use LLM to generate drawing stroke commands for a word."""
+    api_key = os.getenv("GROQ_API_KEY")
+    if not api_key:
+        return []
+
+    prompt = SCRIBBLE_STROKE_PROMPT.format(word=word)
+
+    try:
+        async with httpx.AsyncClient() as client:
+            resp = await client.post(
+                "https://api.groq.com/openai/v1/chat/completions",
+                headers={"Authorization": f"Bearer {api_key}"},
+                json={
+                    "model": "llama-3.3-70b-versatile",
+                    "messages": [{"role": "user", "content": prompt}],
+                    "temperature": 0.6,
+                    "max_tokens": 1500,
+                },
+                timeout=25.0,
+            )
+
+        if resp.status_code != 200:
+            print(f"Stroke gen error: {resp.status_code}")
+            return []
+
+        raw = resp.json()["choices"][0]["message"]["content"].strip()
+
+        # Extract JSON array from response
+        start = raw.find('[')
+        end = raw.rfind(']') + 1
+        if start == -1 or end == 0:
+            return []
+
+        json_str = raw[start:end]
+        strokes = json.loads(json_str)
+
+        # Validate and sanitize strokes
+        valid = []
+        for s in strokes:
+            if isinstance(s, dict) and "t" in s:
+                # Clamp coordinates to canvas bounds
+                valid.append(s)
+
+        return valid[:35]  # max 35 commands
+
+    except Exception as e:
+        print(f"Stroke generation error: {e}")
+        return []
+
+
+def get_fallback_strokes(word: str) -> list:
+    """Generate simple fallback strokes if AI fails."""
+    cx, cy = 260, 190
+    strokes = []
+
+    # Draw a simple question mark style to indicate AI is drawing
+    strokes.append({"t": "c", "x": cx, "y": cy - 30, "r": 50, "c": "#7c6af7", "w": 4})
+    strokes.append({"t": "l", "x1": cx, "y1": cy + 20, "x2": cx, "y2": cy + 50, "c": "#7c6af7", "w": 4})
+    strokes.append({"t": "c", "x": cx, "y": cy + 65, "r": 6, "c": "#7c6af7", "w": 3, "fill": "#7c6af7"})
+
+    # Add some decorative elements
+    for i in range(8):
+        import math
+        angle = i * math.pi / 4
+        x1 = int(cx + 80 * math.cos(angle))
+        y1 = int(cy + 80 * math.sin(angle))
+        x2 = int(cx + 110 * math.cos(angle))
+        y2 = int(cy + 110 * math.sin(angle))
+        strokes.append({"t": "l", "x1": x1, "y1": y1, "x2": x2, "y2": y2, "c": "#e879a0", "w": 3})
+
+    return strokes
 
 
 async def scribble_ai_draw(room: str, drawer: str):
-    """AI's turn to draw: pick a word, generate clues, send to clients."""
-    api_key = os.getenv("GROQ_API_KEY")
-
-    # Pick a random word
+    """AI's turn to draw: pick a word, generate stroke commands, send to clients."""
     word = random.choice(SCRIBBLE_WORD_BANK)
 
-    # Store the word in room state for validation
     room_game_state[room] = {
         "type": "scribble",
         "data": {"current_word": word, "drawer": drawer}
     }
 
-    # Generate clues (try AI, fallback to generic)
-    clues = []
-    if api_key:
-        try:
-            prompt = SCRIBBLE_CLUE_PROMPT.format(word=word)
-
-            async with httpx.AsyncClient() as client:
-                resp = await client.post(
-                    "https://api.groq.com/openai/v1/chat/completions",
-                    headers={"Authorization": f"Bearer {api_key}"},
-                    json={
-                        "model": "llama-3.3-70b-versatile",
-                        "messages": [{"role": "user", "content": prompt}],
-                        "temperature": 0.7,
-                        "max_tokens": 150,
-                    },
-                    timeout=15.0,
-                )
-
-            if resp.status_code == 200:
-                raw = resp.json()["choices"][0]["message"]["content"].strip()
-                lines = [l.strip().lstrip("0123456789.-) ") for l in raw.split("\n") if l.strip()]
-                clues = lines[:5]
-        except Exception:
-            pass
-
-    # Fallback generic clues if AI fails
-    if len(clues) < 3:
-        clues = [
-            f"It has {len(word)} letters",
-            f"Think about everyday objects",
-            f"It starts with '{word[0].upper()}'",
-            f"The second letter is '{word[1].upper()}'" if len(word) > 1 else "Short word!",
-            f"Almost rhymes with something common"
-        ]
-
-    # Send to all clients
     drawer_name = "Groq-AI" if drawer == "groq" else "Router-AI"
+
+    # Generate stroke commands
+    strokes = await generate_ai_strokes(word)
+    if not strokes:
+        strokes = get_fallback_strokes(word)
+
+    # Also generate progressive clues as fallback text hints shown in chat
+    clues = [
+        f"It has {len(word)} letters",
+        f"First letter: '{word[0].upper()}'",
+        f"Think about what a {word} looks like",
+        f"Almost there — look at the drawing!",
+        f"Last letter: '{word[-1].upper()}'"
+    ]
+
+    # Send drawing start event with strokes
     payload = json.dumps({
         "sender": drawer_name,
-        "message": f'__SCRIBBLE__:{json.dumps({"event": "ai_draw_start", "word": word, "clues": clues, "drawer": drawer})}',
+        "message": f'__SCRIBBLE__:{json.dumps({"event": "ai_draw_start", "word": word, "clues": clues, "strokes": strokes, "drawer": drawer})}',
         "image": None,
         "room": room
     })
@@ -648,7 +675,6 @@ async def scribble_ai_draw(room: str, drawer: str):
 async def ws_endpoint(ws: WebSocket, room: str, username: str):
     await manager.connect(ws, room)
 
-    # Replay history for new joiner (skip raw game blobs)
     for item in get_history(room):
         if not is_game_message(item["message"]):
             try:
@@ -656,7 +682,6 @@ async def ws_endpoint(ws: WebSocket, room: str, username: str):
             except Exception:
                 pass
 
-    # Notify room
     await manager.broadcast(f"{username} joined Room {room}!", "System", room)
 
     try:
@@ -671,25 +696,21 @@ async def ws_endpoint(ws: WebSocket, room: str, username: str):
             image = data.get("image")
 
             if image:
-                # Handle image upload
                 desc = await describe_image(image)
                 add_history(room, username, desc)
                 await manager.broadcast(desc, username, room, image=image)
                 asyncio.create_task(trigger_ai(room, chain=0, is_game_event=False))
 
             elif msg.startswith("__SCRIBBLE__:"):
-                # Scribble game message
                 try:
                     scribble_data = json.loads(msg[len("__SCRIBBLE__:"):])
                     event = scribble_data.get("event", "")
 
                     if event == "game_start":
-                        # Notify AIs about the scribble game
                         add_history(room, username, "[SCRIBBLE game started! Drawing & guessing game.]")
                         asyncio.create_task(trigger_ai(room, chain=0, is_game_event=True))
 
                     elif event == "user_draw_start":
-                        # User is drawing — store word for AI vision guessing
                         word = scribble_data.get("word", "")
                         room_game_state[room] = {
                             "type": "scribble",
@@ -698,7 +719,7 @@ async def ws_endpoint(ws: WebSocket, room: str, username: str):
                         add_history(room, username, f"[SCRIBBLE: {username} is drawing ({scribble_data.get('wordLength', '?')} letters)]")
 
                     elif event == "canvas_snapshot":
-                        # AI vision guessing — process canvas image
+                        # AI vision guessing — process compressed canvas image
                         canvas_image = scribble_data.get("image", "")
                         hint = scribble_data.get("hint", "")
                         word_length = scribble_data.get("wordLength", 0)
@@ -709,16 +730,11 @@ async def ws_endpoint(ws: WebSocket, room: str, username: str):
                             )
 
                     elif event == "ai_draw_request":
-                        # AI's turn to draw — pick word, generate clues
                         drawer = scribble_data.get("drawer", "groq")
                         asyncio.create_task(scribble_ai_draw(room, drawer))
 
                     elif event == "user_guess":
-                        # User guessing during AI draw turn
                         guess = scribble_data.get("guess", "")
-                        state = room_game_state.get(room, {})
-                        current_word = state.get("data", {}).get("current_word", "")
-                        # Validation is done client-side, log it
                         add_history(room, username, f'[SCRIBBLE: {username} guessed "{guess}"]')
 
                     elif event in ("round_guessed", "round_timeout", "game_over"):
@@ -728,11 +744,10 @@ async def ws_endpoint(ws: WebSocket, room: str, username: str):
                             asyncio.create_task(trigger_ai(room, chain=0, is_game_event=True))
                     else:
                         await manager.broadcast(msg, username, room)
-                except Exception:
-                    pass
+                except Exception as e:
+                    print(f"Scribble handler error: {e}")
 
             elif is_game_message(msg):
-                # Ludo / Chess state update
                 parsed = parse_game_message(msg)
                 update_game_state(room, parsed)
 
@@ -745,7 +760,6 @@ async def ws_endpoint(ws: WebSocket, room: str, username: str):
                     asyncio.create_task(trigger_ai(room, chain=0, is_game_event=True))
 
             else:
-                # Normal chat message
                 add_history(room, username, msg)
                 await manager.broadcast(msg, username, room)
                 asyncio.create_task(trigger_ai(room, chain=0, is_game_event=False))
