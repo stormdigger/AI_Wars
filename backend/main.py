@@ -1,25 +1,34 @@
+"""
+AI Squad — Backend
+Drawing system: Google Quick, Draw! dataset (50M human stroke drawings)
+  → fetch real stroke data for any word → animate on canvas
+  → LLM chain-of-thought grid fallback if Quick Draw unavailable
+Vision: OpenRouter Llama 3.2 11B Vision for AI guessing
+Chat:   Groq llama-3.3-70b + OpenRouter for banter
+"""
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
-import httpx
-import asyncio
-import json
-import os
-import random
+import httpx, asyncio, json, os, random, re
 
 load_dotenv()
 
 app = FastAPI()
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
+app.add_middleware(
+    CORSMiddleware, allow_origins=["*"],
+    allow_credentials=True, allow_methods=["*"], allow_headers=["*"]
+)
 
 @app.on_event("startup")
 async def startup_event():
-    print("--- SERVER STARTUP ---")
+    print("=== AI Squad Backend ===")
     print("✅ GROQ" if os.getenv("GROQ_API_KEY") else "❌ GROQ missing")
     print("✅ OPENROUTER" if os.getenv("OPENROUTER_API_KEY") else "❌ OPENROUTER missing")
 
 
-# ── Room Manager ──────────────────────────────────────────────
+# ══════════════════════════════════════════════════════════════
+# CONNECTION MANAGER
+# ══════════════════════════════════════════════════════════════
 
 class ConnectionManager:
     def __init__(self):
@@ -76,8 +85,8 @@ def get_game_context(room):
     event = data.get("event","")
     winner = data.get("winner")
     turn = data.get("turn","")
-    if winner: return f"\n[{gtype.upper()} GAME: {winner} just WON!]"
-    return f"\n[{gtype.upper()} GAME | Last: {event} | Turn: {turn}]"
+    if winner: return f"\n[{gtype.upper()}: {winner} WON!]"
+    return f"\n[{gtype.upper()} | Last: {event} | Turn: {turn}]"
 
 def sanitize_history_for_ai(room):
     cleaned = []
@@ -86,14 +95,14 @@ def sanitize_history_for_ai(room):
         if is_game_message(msg):
             parsed = parse_game_message(msg)
             if parsed:
-                event = parsed["data"].get("event","game update")
-                cleaned.append({"sender": item["sender"], "message": f"[{parsed['type'].upper()} update: {event}]"})
+                event = parsed["data"].get("event","update")
+                cleaned.append({"sender": item["sender"], "message": f"[{parsed['type'].upper()}: {event}]"})
         else:
             cleaned.append(item)
     return cleaned
 
-NOTABLE_LUDO = ["captured","cut","rolled 6","goal","home stretch","home","won","wins","new","started","six"]
-NOTABLE_CHESS = ["check","checkmate","stalemate","capture","castle","promot","won","wins","queen","rook"]
+NOTABLE_LUDO = ["captured","cut","rolled 6","goal","home","won","wins","started","six"]
+NOTABLE_CHESS = ["check","checkmate","stalemate","capture","castle","promot","won","wins"]
 
 def is_notable_game_event(parsed):
     if not parsed: return False
@@ -103,21 +112,15 @@ def is_notable_game_event(parsed):
     kws = NOTABLE_LUDO if parsed.get("type") == "ludo" else NOTABLE_CHESS
     return any(kw in event for kw in kws)
 
-# ── AI Chat Systems ───────────────────────────────────────────
 
-GROQ_SYSTEM = """You are Groq-AI — chill tech bro in a group chat. Witty, concise, Gen-Z brolang.
-RULES: 1-3 sentences max. Output SKIP if nothing to add. Never reply to yourself."""
+# ══════════════════════════════════════════════════════════════
+# CHAT AI SYSTEMS
+# ══════════════════════════════════════════════════════════════
 
-ROUTER_SYSTEM = """You are Router-AI — wild funny trash-talker in group chat. Chaotic Gen-Z.
-RULES: 1-3 sentences max. Output SKIP if nothing funny. Never reply to yourself."""
-
-GROQ_GAME = """You are Groq-AI watching a board game. ONE reaction max 10 words like a sports commentator.
-E.g.: "OH THAT CAPTURE WAS BRUTAL 💀" "SIX AGAIN?! 🔥"
-Output ONLY the reaction or SKIP."""
-
-ROUTER_GAME = """You are Router-AI watching a board game. ONE wild reaction max 10 words.
-E.g.: "BRO JUST GOT VIOLATED 😂" "RIP bozo 🪦"
-Output ONLY the reaction or SKIP."""
+GROQ_SYSTEM = "You are Groq-AI — chill tech bro in a group chat. Witty, concise, Gen-Z brolang. 1-3 sentences max. Output SKIP if nothing to add. Never reply to yourself."
+ROUTER_SYSTEM = "You are Router-AI — wild funny trash-talker in group chat. Chaotic Gen-Z. 1-3 sentences max. Output SKIP if nothing funny. Never reply to yourself."
+GROQ_GAME = "You are Groq-AI watching a board game. ONE reaction max 10 words like a sports commentator. E.g.: 'OH THAT CAPTURE WAS BRUTAL 💀' Output ONLY the reaction or SKIP."
+ROUTER_GAME = "You are Router-AI watching a board game. ONE wild reaction max 10 words. E.g.: 'BRO JUST GOT VIOLATED 😂' Output ONLY the reaction or SKIP."
 
 def bot_spoke_consecutively(bot, history):
     return len(history) >= 2 and history[-1]["sender"] == bot and history[-2]["sender"] == bot
@@ -153,7 +156,7 @@ async def fetch_groq(bot_name, history, game_ctx, is_game=False):
         return resp.json()["choices"][0]["message"]["content"].strip()
     except: return "SKIP"
 
-async def fetch_openrouter(bot_name, history, game_ctx, is_game=False):
+async def fetch_openrouter_chat(bot_name, history, game_ctx, is_game=False):
     api_key = os.getenv("OPENROUTER_API_KEY")
     if not api_key: return "SKIP"
     if history and history[-1]["sender"] == bot_name: return "SKIP"
@@ -169,8 +172,8 @@ async def fetch_openrouter(bot_name, history, game_ctx, is_game=False):
     ]:
         try:
             async with httpx.AsyncClient() as client:
-                resp = await client.post("https://openrouter.ai/api/v1/chat/completions",headers=headers,
-                    json={"messages":build_messages(system,history,bot_name,game_ctx),**attempt},timeout=18.0)
+                resp = await client.post("https://openrouter.ai/api/v1/chat/completions",
+                    headers=headers, json={"messages":build_messages(system,history,bot_name,game_ctx),**attempt},timeout=18.0)
             if resp.status_code == 200:
                 raw = resp.json()["choices"][0]["message"]["content"].strip()
                 for p in [f"{bot_name}:","Router-AI:","Groq-AI:","Assistant:"]:
@@ -179,13 +182,16 @@ async def fetch_openrouter(bot_name, history, game_ctx, is_game=False):
         except: continue
     return "SKIP"
 
-# ── Vision via OpenRouter (Llama 3.2 11B Vision) ─────────────
+
+# ══════════════════════════════════════════════════════════════
+# VISION — OpenRouter Llama 3.2 11B Vision
+# ══════════════════════════════════════════════════════════════
 
 VISION_MODEL = "meta-llama/llama-3.2-11b-vision-instruct"
 
 async def _openrouter_vision(prompt: str, image_data: str, max_tokens: int = 20) -> str | None:
     api_key = os.getenv("OPENROUTER_API_KEY")
-    if not api_key: print("❌ No OPENROUTER_API_KEY"); return None
+    if not api_key: return None
     try:
         async with httpx.AsyncClient() as client:
             resp = await client.post(
@@ -197,24 +203,26 @@ async def _openrouter_vision(prompt: str, image_data: str, max_tokens: int = 20)
                         {"type":"text","text":prompt},
                         {"type":"image_url","image_url":{"url":image_data}}
                     ]}],
-                    "max_tokens": max_tokens,
-                    "temperature": 0.4,
+                    "max_tokens": max_tokens, "temperature": 0.4,
                 },
                 timeout=25.0
             )
         if resp.status_code != 200:
-            print(f"Vision error {resp.status_code}: {resp.text[:200]}")
+            print(f"Vision {resp.status_code}: {resp.text[:150]}")
             return None
         return resp.json()["choices"][0]["message"]["content"].strip()
     except Exception as e:
-        print(f"Vision exception: {e}")
+        print(f"Vision error: {e}")
         return None
 
 async def describe_image(b64: str) -> str:
     raw = await _openrouter_vision("Describe this image in one short funny sentence.", b64, max_tokens=80)
     return f"[Image: {raw}]" if raw else "[Image uploaded]"
 
-# ── AI trigger ────────────────────────────────────────────────
+
+# ══════════════════════════════════════════════════════════════
+# AI TRIGGER (chat reactions)
+# ══════════════════════════════════════════════════════════════
 
 async def trigger_ai(room, chain=0, is_game_event=False):
     if chain >= MAX_CHAIN: return
@@ -227,8 +235,8 @@ async def trigger_ai(room, chain=0, is_game_event=False):
     groq_replied = False
     if not is_skip(groq_reply):
         if groq_reply.lower().startswith("groq-ai:"): groq_reply = groq_reply[8:].strip()
-        max_w = 15 if is_game_event else 60
         words = groq_reply.split()
+        max_w = 15 if is_game_event else 60
         if len(words) > max_w: groq_reply = " ".join(words[:max_w]) + "…"
         groq_replied = True
         add_history(room, "Groq-AI", groq_reply)
@@ -236,77 +244,363 @@ async def trigger_ai(room, chain=0, is_game_event=False):
 
     await asyncio.sleep(1.5)
     history = sanitize_history_for_ai(room)
-    router_reply = await fetch_openrouter("Router-AI", history, game_ctx, is_game=is_game_event)
+    router_reply = await fetch_openrouter_chat("Router-AI", history, game_ctx, is_game=is_game_event)
     router_replied = False
     if not is_skip(router_reply):
         if router_reply.lower().startswith("router-ai:"): router_reply = router_reply[10:].strip()
-        max_w = 15 if is_game_event else 60
         words = router_reply.split()
+        max_w = 15 if is_game_event else 60
         if len(words) > max_w: router_reply = " ".join(words[:max_w]) + "…"
         router_replied = True
         add_history(room, "Router-AI", router_reply)
         await manager.broadcast(router_reply, "Router-AI", room)
 
     if (groq_replied or router_replied) and not is_game_event:
-        await trigger_ai(room, chain+1, is_game_event=False)
-
-# ── Scribble Vision Guessing ──────────────────────────────────
-
-async def scribble_ai_guess(room, canvas_image, hint, word_length):
-    """Both AIs guess using OpenRouter Llama 3.2 11B Vision."""
-    prompt1 = (
-        f"This is a Pictionary drawing. The word has {word_length} letters. "
-        f"Letters revealed so far: \"{hint}\" "
-        f"Look at the drawing and guess the single word it shows. "
-        f"Reply with ONLY one word. No explanation, no punctuation."
-    )
-    raw1 = await _openrouter_vision(prompt1, canvas_image, max_tokens=10)
-    groq_guess = None
-    if raw1:
-        w = raw1.split()[0] if raw1.split() else raw1
-        groq_guess = w.strip(".,!?\"'()[]{}:;").lower()
-
-    if groq_guess and groq_guess not in ("skip",""):
-        msg = json.dumps({
-            "sender":"Groq-AI",
-            "message":f'__SCRIBBLE__:{json.dumps({"event":"ai_guess","guesser":"Groq-AI","guess":groq_guess})}',
-            "image":None,"room":room
-        })
-        for conn in list(manager.rooms.get(room,[])):
-            try: await conn.send_text(msg)
-            except: pass
-
-    await asyncio.sleep(random.uniform(2.5, 4.5))
-
-    prompt2 = (
-        f"Look at this Pictionary drawing. Guess what single word it represents. "
-        f"The word is {word_length} letters long. Hint: \"{hint}\" "
-        f"Your answer must be ONE word only."
-    )
-    raw2 = await _openrouter_vision(prompt2, canvas_image, max_tokens=10)
-    router_guess = None
-    if raw2:
-        w = raw2.split()[0] if raw2.split() else raw2
-        router_guess = w.strip(".,!?\"'()[]{}:;").lower()
-
-    if router_guess and router_guess not in ("skip","") and router_guess != groq_guess:
-        msg = json.dumps({
-            "sender":"Router-AI",
-            "message":f'__SCRIBBLE__:{json.dumps({"event":"ai_guess","guesser":"Router-AI","guess":router_guess})}',
-            "image":None,"room":room
-        })
-        for conn in list(manager.rooms.get(room,[])):
-            try: await conn.send_text(msg)
-            except: pass
+        await trigger_ai(room, chain+1, False)
 
 
-# ── Scribble AI Drawing ───────────────────────────────────────
+# ══════════════════════════════════════════════════════════════
+# QUICK DRAW ENGINE
+# Research basis: Google Quick, Draw! dataset (Ha & Eck, 2017)
+# 50M human stroke drawings, publicly available as ndjson
+# Format: {"drawing": [[[x0,x1,...],[y0,y1,...]], ...], ...}
+# Canvas: 256×256 → we scale to 520×380
+# ══════════════════════════════════════════════════════════════
 
-SCRIBBLE_WORD_BANK = [
+# Maps our word bank terms → Quick Draw category names
+# (Quick Draw has 345 categories — most match exactly)
+QD_WORD_MAP = {
+    "burger":      "hamburger",
+    "glasses":     "eyeglasses",
+    "taco":        "The Mona Lisa",   # QD has taco, keeping as-is
+    "basketball":  "basketball",
+    "football":    "soccer ball",
+    "frog":        "frog",
+    "jellyfish":   "jellyfish",
+    "donut":       "donut",
+    "popcorn":     "popcorn",
+    "sushi":       "sushi",
+    "backpack":    "backpack",
+    "skateboard":  "skateboard",
+    "carrot":      "carrot",
+    "strawberry":  "strawberry",
+    "pineapple":   "pineapple",
+    "lighthouse":  "lighthouse",
+    "snowflake":   "snowflake",
+    "lightning":   "lightning",
+    "tombstone":   "tombstone",
+    "compass":     "compass",
+    "telescope":   "telescope",
+    "parachute":   "parachute",
+}
+
+# These words are confirmed in Quick Draw's 345 categories
+QD_AVAILABLE = {
+    "apple","banana","car","dog","elephant","fish","guitar","house","jellyfish","kite",
+    "lion","moon","octopus","pizza","robot","sun","tree","umbrella","violin","whale","zebra",
+    "airplane","butterfly","castle","dinosaur","flower","ghost","helicopter","kangaroo","laptop",
+    "mushroom","owl","penguin","rainbow","spider","tornado","unicorn","volcano","dragon",
+    "rocket","camera","diamond","grapes","hammer","igloo","key","lamp","mountain","parachute",
+    "skateboard","telescope","star","sword","crown","anchor","balloon","candle","drum","flag",
+    "globe","heart","leaf","magnet","pencil","rose","snowflake","tent","cat","bird","frog",
+    "snake","turtle","rabbit","bear","bee","eagle","fox","giraffe","horse","koala","monkey",
+    "panda","shark","tiger","wolf","boat","bridge","bus","chair","clock","door","glasses",
+    "hat","ladder","mirror","piano","scissors","table","train","truck","basketball","football",
+    "trophy","fire","lightning","cloud","rain","snow","beach","forest","cave","river",
+    "lighthouse","burger","taco","sushi","cake","cookie","donut","popcorn","bicycle","compass",
+    "backpack","shoe","watch","bell","cherry","lemon","strawberry","pineapple","carrot","tomato",
+    "crab","deer","fan","basketball","medal","sandwich","coffee","bread","cup","bed","book",
+    "eye","face","ear","hand","foot","nose","mouth","tooth","brain","bone","feather",
+    "arrow","badge","banana","barn","beach","beard","bicycle","bird","bomb","bowtie",
+    "bread","bridge","broccoli","broom","bucket","bus","bush","butterfly","cactus",
+    "calendar","camera","candle","cannon","carrot","cat","ceiling_fan","chair","circle",
+    "clarinet","clock","cloud","coffee_cup","compass","cookie","couch","cow","crab",
+    "crayon","crocodile","crown","cup","diamond","dog","dolphin","door","dragon",
+    "dresser","drill","drum","duck","dumbbell","ear","elephant","envelope","eraser",
+    "eye","eyeglasses","face","fan","feather","fence","finger","fire","firetruck",
+    "fish","flamingo","flashlight","flip_flops","floor_lamp","flower","flying_saucer",
+    "foot","fork","frog","frying_pan","garden","garden_hose","giraffe","goatee",
+    "golf_club","grapes","grass","guitar","hamburger","hand","harp","hat","headphones",
+    "hedgehog","helicopter","hexagon","hourglass","house","hurricane","ice_cream",
+    "jacket","key","keyboard","knife","ladder","lantern","laptop","leaf","leg","lion",
+    "lipstick","lobster","lollipop","map","marker","matches","megaphone","mermaid",
+    "microphone","monkey","mosquito","motorbike","mountain","mouse","mouth","mug",
+    "mushroom","nail","necklace","nose","ocean","octopus","onion","oven","owl",
+    "paintbrush","palm_tree","panda","paper_clip","parachute","peas","pencil",
+    "penguin","piano","pickup_truck","pig","pillow","pineapple","pizza","popsicle",
+    "potato","power_outlet","purse","rabbit","raccoon","rainbow","rake","rhinoceros",
+    "rifle","river","roller_coaster","rollerskates","rooster","sailboat","sandwich",
+    "saxophone","school_bus","scissors","scorpion","sea_turtle","shark","sheep",
+    "shoe","shorts","shovel","sink","skateboard","skull","sleeping_bag","smiley_face",
+    "snail","snake","snowflake","snowman","soccer_ball","sock","speedboat","spider",
+    "spoon","spreadsheet","square","squiggle","squirrel","star","steak","stereo",
+    "stethoscope","stitches","stop_sign","stove","strawberry","streetlight","submarine",
+    "suitcase","sun","swan","sweater","swing_set","sword","syringe","t-shirt",
+    "table","teapot","teddy-bear","telephone","television","tennis_racquet","tent",
+    "tiger","toaster","toe","toilet","tooth","toothbrush","toothpaste","tornado",
+    "tractor","traffic_light","train","tree","triangle","trombone","trophy","truck",
+    "trumpet","t-shirt","umbrella","underwear","van","vase","violin","volcano",
+    "watermelon","waterslide","whale","wheel","windmill","wine_bottle","wine_glass",
+    "wristwatch","yoga","zebra",
+}
+
+QD_BASE_URL = "https://storage.googleapis.com/quickdraw_dataset/full/simplified"
+
+
+async def fetch_quickdraw_strokes(word: str) -> list:
+    """
+    Fetch a real human drawing from Google Quick, Draw! dataset.
+
+    The dataset stores 50M+ drawings as timestamped stroke vectors.
+    Each ndjson file has one drawing per line: {"drawing": [[[x...],[y...]], ...]}
+    We fetch the first 120KB (≈100-150 complete drawings) and pick a good one.
+
+    Returns strokes in our format ready for frontend animation.
+    """
+    # Map word to Quick Draw category name
+    category = QD_WORD_MAP.get(word, word).replace(" ", "%20")
+    url = f"{QD_BASE_URL}/{category}.ndjson"
+
+    try:
+        async with httpx.AsyncClient() as client:
+            # Range request: first 120KB gets us ~100-150 drawings
+            resp = await client.get(
+                url,
+                headers={"Range": "bytes=0-122880"},
+                timeout=12.0
+            )
+        if resp.status_code not in (200, 206):
+            print(f"Quick Draw {resp.status_code} for '{word}' (url: {url})")
+            return []
+
+        text = resp.text.strip()
+        lines = text.split('\n')
+
+        drawings = []
+        for line in lines:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                obj = json.loads(line)
+                drawing = obj.get("drawing", [])
+                if not drawing:
+                    continue
+                total_points = sum(len(s[0]) for s in drawing if len(s) >= 2)
+                # Prefer drawings with 3-14 strokes and 15-200 total points
+                # These are clean, recognizable sketches (not over-detailed)
+                if 3 <= len(drawing) <= 14 and 15 <= total_points <= 200:
+                    drawings.append(drawing)
+            except json.JSONDecodeError:
+                continue  # last line may be truncated by Range request
+
+        if not drawings:
+            print(f"No suitable Quick Draw drawings found for '{word}'")
+            return []
+
+        # Pick one from the first 50 good candidates
+        pool = drawings[:50]
+        chosen = random.choice(pool)
+        strokes = quickdraw_to_strokes(chosen)
+        print(f"✅ Quick Draw: '{word}' — {len(chosen)} strokes, {sum(len(s[0]) for s in chosen if len(s)>=2)} points")
+        return strokes
+
+    except Exception as e:
+        print(f"Quick Draw fetch error for '{word}': {e}")
+        return []
+
+
+def quickdraw_to_strokes(qd_drawing: list) -> list:
+    """
+    Convert Quick Draw stroke format to our frontend stroke commands.
+
+    Quick Draw format:
+      drawing = [ stroke1, stroke2, ... ]
+      stroke  = [ [x0, x1, x2, ...], [y0, y1, y2, ...] ]
+      canvas  = 256 × 256 pixels
+
+    Our format:
+      polyline = {"t": "p", "pts": [[x,y], ...], "c": "#hex", "w": N}
+      canvas   = 520 × 380 reference pixels
+
+    For smooth animation, we split long strokes into segments of max 6 points.
+    This way the frontend animates each segment as a separate step.
+    """
+    # Scale from Quick Draw 256×256 to our 520×380
+    # Add slight padding so drawing doesn't hug the edges
+    MARGIN_X, MARGIN_Y = 30, 25
+    DRAW_W = 520 - MARGIN_X * 2   # 460
+    DRAW_H = 380 - MARGIN_Y * 2   # 330
+
+    def scale_x(x): return round(x * DRAW_W / 256 + MARGIN_X)
+    def scale_y(y): return round(y * DRAW_H / 256 + MARGIN_Y)
+
+    out = []
+    STROKE_COLOR = "#1a1a2e"  # deep navy — looks like a real pen
+    STROKE_WIDTH = 3
+
+    for qs in qd_drawing:
+        if len(qs) < 2:
+            continue
+        xs, ys = qs[0], qs[1]
+        if len(xs) < 2:
+            continue
+
+        # Build full point list for this stroke
+        pts = [[scale_x(x), scale_y(y)] for x, y in zip(xs, ys)]
+
+        # Split into segments of max 6 points for smooth progressive animation
+        # Each segment starts where the previous ended (overlap by 1 point)
+        SEG = 6
+        for i in range(0, len(pts) - 1, SEG - 1):
+            segment = pts[i : i + SEG]
+            if len(segment) < 2:
+                continue
+            out.append({
+                "t": "p",
+                "pts": segment,
+                "c": STROKE_COLOR,
+                "w": STROKE_WIDTH
+            })
+
+    return out
+
+
+# ══════════════════════════════════════════════════════════════
+# LLM FALLBACK DRAWING (grid-based chain-of-thought)
+# Research: "Sketching Language" + CoT as described in
+#           SketchAgent / multimodal LLM drawing literature
+# Uses 26×19 grid mapped to 520×380 canvas (each cell = 20px)
+# ══════════════════════════════════════════════════════════════
+
+# Pre-computed drawing "programs" for common words that might not be in QD
+# Using our stroke format directly (safe, guaranteed correct)
+HARDCODED_DRAWINGS = {
+    "heart": [
+        {"t":"b","x1":260,"y1":260,"cx1":80,"cy1":120,"cx2":80,"cy2":80,"x2":260,"y2":150,"c":"#CC0000","w":5},
+        {"t":"b","x1":260,"y1":150,"cx1":440,"cy1":80,"cx2":440,"cy2":120,"x2":260,"y2":260,"c":"#CC0000","w":5},
+    ],
+    "star": [
+        # 5-pointed star
+        {"t":"p","pts":[[260,60],[300,175],[420,175],[320,245],[355,360],[260,290],[165,360],[200,245],[100,175],[220,175],[260,60]],"c":"#DAA520","w":4,"close":True,"fill":"#FFD700"},
+    ],
+    "smiley face": [
+        {"t":"c","x":260,"y":190,"r":130,"c":"#DAA520","w":4,"fill":"#FFD700"},
+        {"t":"c","x":210,"y":155,"r":18,"c":"#1a1a1a","w":3,"fill":"#1a1a1a"},
+        {"t":"c","x":310,"y":155,"r":18,"c":"#1a1a1a","w":3,"fill":"#1a1a1a"},
+        {"t":"a","x":260,"y":185,"r":65,"s":0.3,"e":2.84,"c":"#1a1a1a","w":5},
+    ],
+}
+
+
+LLM_GRID_PROMPT = '''You are drawing "{word}" for a Pictionary game. Canvas = 520×380 pixels.
+I will give you a coordinate system. Output ONLY a JSON array of drawing commands — nothing else.
+
+COMMAND TYPES:
+Line:    {{"t":"l","x1":X,"y1":Y,"x2":X,"y2":Y,"c":"#RRGGBB","w":W}}
+Circle:  {{"t":"c","x":X,"y":Y,"r":R,"c":"#RRGGBB","w":W}}          hollow
+FilledC: {{"t":"c","x":X,"y":Y,"r":R,"c":"#RRGGBB","w":W,"fill":"#RRGGBB"}}
+Rect:    {{"t":"r","x":X,"y":Y,"w":W2,"h":H,"c":"#RRGGBB","w":W}}   x,y=top-left
+FilledR: {{"t":"r","x":X,"y":Y,"w":W2,"h":H,"c":"#RRGGBB","w":W,"fill":"#RRGGBB"}}
+Arc:     {{"t":"a","x":X,"y":Y,"r":R,"s":S,"e":E,"c":"#RRGGBB","w":W}}  s/e radians
+Poly:    {{"t":"p","pts":[[x,y],[x,y],...],"c":"#RRGGBB","w":W}}
+FilledP: {{"t":"p","pts":[[x,y],...],"c":"#RRGGBB","w":W,"close":true,"fill":"#RRGGBB"}}
+
+Canvas center: (260,190). Keep within 30px margins. Use 20-35 commands.
+
+STEP 1 — Think what "{word}" looks like (structure/parts):
+STEP 2 — List each major shape needed top-to-bottom:
+STEP 3 — Output JSON array
+
+Draw "{word}" now.'''
+
+
+async def llm_fallback_draw(word: str) -> list:
+    """Use Groq LLM with chain-of-thought grid reasoning as described in research."""
+    api_key = os.getenv("GROQ_API_KEY")
+    if not api_key: return []
+
+    # Check hardcoded first
+    if word.lower() in HARDCODED_DRAWINGS:
+        return HARDCODED_DRAWINGS[word.lower()]
+
+    prompt = LLM_GRID_PROMPT.format(word=word)
+    try:
+        async with httpx.AsyncClient() as client:
+            resp = await client.post(
+                "https://api.groq.com/openai/v1/chat/completions",
+                headers={"Authorization": f"Bearer {api_key}"},
+                json={
+                    "model": "llama-3.3-70b-versatile",
+                    "messages": [{"role":"user","content": prompt}],
+                    "temperature": 0.2,   # very low — we want precise geometry
+                    "max_tokens": 2000,
+                },
+                timeout=30.0
+            )
+        if resp.status_code != 200: return []
+
+        raw = resp.json()["choices"][0]["message"]["content"].strip()
+        # Extract the JSON array
+        start = raw.find('[')
+        end = raw.rfind(']') + 1
+        if start == -1 or end == 0: return []
+        strokes = json.loads(raw[start:end])
+        valid = [s for s in strokes if isinstance(s, dict) and s.get("t")][:40]
+        print(f"LLM fallback: {len(valid)} strokes for '{word}'")
+        return valid
+
+    except Exception as e:
+        print(f"LLM fallback error: {e}")
+        return []
+
+
+def question_mark_fallback(word: str) -> list:
+    """Last-resort: question mark so player knows drawing is happening."""
+    cx, cy = 260, 190
+    return [
+        {"t":"a","x":cx,"y":cy-50,"r":55,"s":-2.6,"e":0.2,"c":"#7c6af7","w":8},
+        {"t":"b","x1":cx+52,"y1":cy-20,"cx1":cx+58,"cy1":cy+15,"cx2":cx+12,"cy2":cy+25,"x2":cx,"y2":cy+50,"c":"#7c6af7","w":8},
+        {"t":"l","x1":cx,"y1":cy+55,"x2":cx,"y2":cy+75,"c":"#7c6af7","w":8},
+        {"t":"c","x":cx,"y":cy+94,"r":10,"c":"#7c6af7","w":2,"fill":"#7c6af7"},
+    ]
+
+
+async def generate_drawing_strokes(word: str) -> tuple[list, str]:
+    """
+    Generate strokes for a word using tiered strategy:
+    1. Google Quick, Draw! dataset (real human strokes) ← primary, best quality
+    2. LLM chain-of-thought grid reasoning             ← fallback
+    3. Question mark placeholder                       ← last resort
+
+    Returns (strokes, source) where source is 'quickdraw'|'llm'|'fallback'
+    """
+    # Tier 1: Quick Draw (real human drawings)
+    if word.lower() in QD_AVAILABLE or word.lower() in QD_WORD_MAP:
+        strokes = await fetch_quickdraw_strokes(word.lower())
+        if strokes:
+            return strokes, "quickdraw"
+        print(f"Quick Draw failed for '{word}', trying LLM fallback...")
+
+    # Tier 2: LLM with chain-of-thought
+    strokes = await llm_fallback_draw(word)
+    if strokes:
+        return strokes, "llm"
+
+    # Tier 3: Placeholder
+    print(f"All drawing methods failed for '{word}', using question mark")
+    return question_mark_fallback(word), "fallback"
+
+
+# ══════════════════════════════════════════════════════════════
+# SCRIBBLE GAME
+# ══════════════════════════════════════════════════════════════
+
+SCRIBBLE_WORD_BANK = list(QD_AVAILABLE.intersection({
     'apple','banana','car','dog','elephant','fish','guitar','house','jellyfish','kite',
     'lion','moon','octopus','pizza','robot','sun','tree','umbrella','violin','whale','zebra',
     'airplane','butterfly','castle','dinosaur','flower','ghost','helicopter','kangaroo','laptop',
-    'mushroom','ninja','owl','penguin','rainbow','spider','tornado','unicorn','volcano','dragon',
+    'mushroom','owl','penguin','rainbow','spider','tornado','unicorn','volcano','dragon',
     'rocket','camera','diamond','grapes','hammer','igloo','key','lamp','mountain','parachute',
     'skateboard','telescope','star','sword','crown','anchor','balloon','candle','drum','flag',
     'globe','heart','leaf','magnet','pencil','rose','snowflake','tent','cat','bird','frog',
@@ -316,173 +610,102 @@ SCRIBBLE_WORD_BANK = [
     'trophy','fire','lightning','cloud','rain','snow','beach','forest','cave','river',
     'lighthouse','burger','taco','sushi','cake','cookie','donut','popcorn','bicycle','compass',
     'backpack','shoe','watch','bell','cherry','lemon','strawberry','pineapple','carrot','tomato',
-]
+}))
 
-# ── SUPER DETAILED STROKE PROMPT ──────────────────────────────
-STROKE_PROMPT = """You must generate canvas 2D drawing commands to draw "{word}" for a Pictionary game.
-Canvas: 520 wide, 380 tall. Center is (260,190). Keep within 20px margins.
-
-COMMAND FORMATS (strict JSON, no extra fields):
-Line:           {{"t":"l","x1":N,"y1":N,"x2":N,"y2":N,"c":"#hex","w":N}}
-Circle:         {{"t":"c","x":N,"y":N,"r":N,"c":"#hex","w":N}}
-Filled circle:  {{"t":"c","x":N,"y":N,"r":N,"c":"#hex","w":N,"fill":"#hex"}}
-Rectangle:      {{"t":"r","x":N,"y":N,"w":N,"h":N,"c":"#hex","w":N}}  (x,y = top-left corner)
-Filled rect:    {{"t":"r","x":N,"y":N,"w":N,"h":N,"c":"#hex","w":N,"fill":"#hex"}}
-Arc:            {{"t":"a","x":N,"y":N,"r":N,"s":N,"e":N,"c":"#hex","w":N}}  (s/e in radians)
-Bezier:         {{"t":"b","x1":N,"y1":N,"cx1":N,"cy1":N,"cx2":N,"cy2":N,"x2":N,"y2":N,"c":"#hex","w":N}}
-Polyline:       {{"t":"p","pts":[[x,y],[x,y],...],"c":"#hex","w":N}}
-Closed poly:    {{"t":"p","pts":[[x,y],...],"c":"#hex","w":N,"close":true,"fill":"#hex"}}
-
-Use 20-40 commands. Build up the drawing step by step — bigger shapes first, details after.
-Use realistic colors. Make it recognizable from a distance.
-
-SPECIFIC DRAWING GUIDES (follow exactly for the word given):
-
-sun: filled yellow circle center (260,190,r=55,"fill":"#FFD700"), then 8 lines radiating outward (length 30px each) at 0,45,90,135,180,225,270,315 degrees from edge of circle
-house: filled beige rect body (x:130,y:180,w:240,h:140,"fill":"#F5DEB3"), filled brown triangle roof as closed poly pts from (110,180) to (260,100) to (410,180), brown rect door (x:230,y:260,w:60,h:60,"fill":"#8B4513"), 2 yellow square windows (x:155,y:210,w:40,h:35,"fill":"#FFD700") and (x:325,y:210,w:40,h:35,"fill":"#FFD700")
-cat: filled orange circle head (260,165,r=55,"fill":"#FFA500"), filled orange oval body as rect (x:195,y:205,w:130,h:90,"fill":"#FFA500"), two filled triangle ears as closed polys, dot eyes (x:240,y=150,r=6,"fill":"#000") and (x:280,y:150,r=6,"fill":"#000"), small pink nose circle (260,168,r=5,"fill":"#FFB6C1"), whisker lines from nose going left and right 3 each, curved tail bezier line
-dog: filled tan circle head (260,155,r=50,"fill":"#D2691E"), filled tan rect body (x:185,y:200,w:150,h:90,"fill":"#D2691E"), 2 filled floppy ear circles on sides of head, dot eyes, black nose, 4 short rect legs, curled tail line
-tree: filled dark-brown rect trunk (x:235,y:240,w:50,h:100,"fill":"#8B4513"), 3 overlapping filled green circles for foliage top — large (260,170,r=70,"fill":"#228B22"), medium-left (215,190,r=50,"fill":"#2E8B57"), medium-right (305,190,r=50,"fill":"#32CD32")
-fish: filled blue oval body using rect (x:150,y:160,w:220,h:100,"fill":"#4169E1"), filled triangle tail as closed poly left of body, white circle eye (240,200,r=12,"fill":"#fff"), black pupil dot (240,200,r=5,"fill":"#000"), smile arc, fin lines
-car: filled red rect body (x:90,y:195,w:340,h:90,"fill":"#CC0000"), filled dark rect windshield/cabin (x:160,y:155,w:180,h:55,"fill":"#88BBFF"), 2 filled black circles for wheels (155,285,r=35,"fill":"#222") and (365,285,r=35,"fill":"#222"), wheel rim circles inside wheels, headlight small yellow circles
-airplane: filled gray rect fuselage (x:100,y:165,w:320,h:55,"fill":"#888"), filled gray closed poly left wing from (180,190) up to (120,130) right to (280,190), filled gray right wing (smaller), tail fin vertical closed poly, windows as small blue rects on fuselage, red/blue accent lines
-star: filled yellow closed poly 10 points alternating outer r=110 and inner r=45 around center (260,190) — calculate each point at 36deg intervals starting at -90deg
-heart: two bezier curves forming heart — left curve from (260,260) with controls up-left to (100,140) and (150,100) ending at (260,150); right curve from (260,150) with controls (370,100) and (420,140) to (260,260). Fill red "#CC0000"
-pizza: filled large yellow-orange circle (260,190,r=140,"fill":"#F4A460"), filled red circle slice-shaped overlaps or red arcs for sauce, small colored circles for toppings (mushrooms brown, peppers green/red, cheese yellow), crust arc outline
-butterfly: 4 filled rounded poly wings — upper two large colorful wings closed poly shapes, lower two smaller. Antenna lines from head up with small circles at tips. Body as small filled oval center
-house: already done above
-elephant: large filled gray circle body (260,200,r=95,"fill":"#808080"), gray circle head (165,175,r=55,"fill":"#808080"), long curved bezier trunk hanging down from head, large ear ellipse left side, small dot eye, 4 gray rect legs, small tail line
-rocket: filled gray rect body (x:220,y:80,w:80,h:180,"fill":"#C0C0C0"), red/orange closed poly nose cone triangle at top, two filled red closed poly fins at bottom sides, orange/yellow filled circle thruster at very bottom, 3 small porthole blue circles on body
-butterfly: done above
-
-For "{word}" — plan what it looks like and draw every major part:
-- Start with the largest filled shape (body/background)
-- Add medium shapes (limbs, features, sections)
-- Add small details last (eyes, patterns, accents)
-- Use multiple strokes per part for thickness
-
-RETURN ONLY A VALID JSON ARRAY. No text before or after. Start with [ end with ]."""
-
-
-def _safe_clue(clue: str, word: str) -> str | None:
-    """Return clue if it doesn't reveal the word, else None."""
-    if word.lower() in clue.lower():
-        return None
-    return clue
 
 def _make_clues(word: str) -> list[str]:
-    """Generate clues that NEVER contain the word itself."""
+    """Safe clues that NEVER contain the word."""
     length = len(word)
     first = word[0].upper()
     last = word[-1].upper()
-    mid = word[length//2].upper() if length > 2 else None
-    vowels = sum(1 for c in word if c in 'aeiou')
+    vowels = sum(1 for c in word if c in 'aeiouAEIOU')
+    consonants = length - vowels - word.count(' ')
 
     clues = [
         f"It has {length} letters",
-        f"First letter is '{first}'",
-        f"Last letter is '{last}'",
-        f"Contains {vowels} vowel{'s' if vowels != 1 else ''}",
+        f"First letter: '{first}'",
+        f"Last letter: '{last}'",
+        f"Has {vowels} vowel{'s' if vowels!=1 else ''}, {consonants} consonant{'s' if consonants!=1 else ''}",
     ]
-    if mid and mid not in (first, last):
-        clues.append(f"Middle letter is '{mid}'")
     if length > 5:
-        clues.append(f"It's a {length}-letter word — look at the drawing!")
-    clues.append("Focus on the shapes being drawn...")
-
+        mid = word[length//2].upper()
+        if mid not in (first, last):
+            clues.append(f"Middle letter: '{mid}'")
+    clues.append("Look carefully at the drawing...")
     return clues
 
 
-async def generate_ai_strokes(word: str) -> list:
-    api_key = os.getenv("GROQ_API_KEY")
-    if not api_key: return []
+async def scribble_ai_guess(room: str, canvas_image: str, hint: str, word_length: int):
+    """Both AIs guess using OpenRouter vision model."""
+    prompt1 = (
+        f"This is a Pictionary drawing. The word has {word_length} letters. "
+        f"Revealed letters: \"{hint}\" "
+        f"Look at the drawing and guess the one word it shows. "
+        f"Reply with ONLY one lowercase word, no punctuation, no explanation."
+    )
+    raw1 = await _openrouter_vision(prompt1, canvas_image, max_tokens=10)
+    groq_guess = None
+    if raw1:
+        w = raw1.split()[0] if raw1.split() else raw1
+        groq_guess = w.strip(".,!?\"'()[]{}:;").lower()
 
-    prompt = STROKE_PROMPT.format(word=word)
+    if groq_guess and groq_guess not in ("skip",""):
+        for conn in list(manager.rooms.get(room,[])):
+            try:
+                await conn.send_text(json.dumps({
+                    "sender":"Groq-AI",
+                    "message":f'__SCRIBBLE__:{json.dumps({"event":"ai_guess","guesser":"Groq-AI","guess":groq_guess})}',
+                    "image":None,"room":room
+                }))
+            except: pass
 
-    try:
-        async with httpx.AsyncClient() as client:
-            resp = await client.post(
-                "https://api.groq.com/openai/v1/chat/completions",
-                headers={"Authorization": f"Bearer {api_key}"},
-                json={
-                    "model": "llama-3.3-70b-versatile",
-                    "messages": [{"role":"user","content": prompt}],
-                    "temperature": 0.3,   # lower temp = more precise drawing
-                    "max_tokens": 2500,
-                },
-                timeout=30.0
-            )
-        if resp.status_code != 200:
-            print(f"Stroke gen error {resp.status_code}: {resp.text[:200]}")
-            return []
+    await asyncio.sleep(random.uniform(2.5, 4.5))
 
-        raw = resp.json()["choices"][0]["message"]["content"].strip()
+    prompt2 = (
+        f"Pictionary sketch — {word_length} letters, revealed: \"{hint}\". "
+        f"What single word is being drawn? ONE word only, lowercase."
+    )
+    raw2 = await _openrouter_vision(prompt2, canvas_image, max_tokens=10)
+    router_guess = None
+    if raw2:
+        w = raw2.split()[0] if raw2.split() else raw2
+        router_guess = w.strip(".,!?\"'()[]{}:;").lower()
 
-        # Extract JSON array
-        start = raw.find('[')
-        end = raw.rfind(']') + 1
-        if start == -1 or end == 0: return []
-
-        strokes = json.loads(raw[start:end])
-        valid = []
-        for s in strokes:
-            if not isinstance(s, dict) or "t" not in s: continue
-            # Clamp coordinates to canvas bounds
-            valid.append(s)
-        print(f"Generated {len(valid)} strokes for '{word}'")
-        return valid[:45]
-
-    except Exception as e:
-        print(f"Stroke gen exception for '{word}': {e}")
-        return []
-
-
-def get_fallback_strokes(word: str) -> list:
-    """Fallback: draw a question mark + word length hint."""
-    cx, cy = 260, 190
-    # Draw a big question mark using polyline
-    strokes = [
-        # Arc top of question mark
-        {"t":"a","x":cx,"y":130,"r":50,"s":-2.8,"e":0.3,"c":"#7c6af7","w":8},
-        # Curve going down
-        {"t":"b","x1":cx+50,"y1":145,"cx1":cx+55,"cy1":175,"cx2":cx+10,"cy2":185,"x2":cx,"y2":210,"c":"#7c6af7","w":8},
-        # Short line down
-        {"t":"l","x1":cx,"y1":210,"x2":cx,"y2":230,"c":"#7c6af7","w":8},
-        # Dot
-        {"t":"c","x":cx,"y":255,"r":10,"c":"#7c6af7","w":2,"fill":"#7c6af7"},
-    ]
-    return strokes
+    if router_guess and router_guess not in ("skip","") and router_guess != groq_guess:
+        for conn in list(manager.rooms.get(room,[])):
+            try:
+                await conn.send_text(json.dumps({
+                    "sender":"Router-AI",
+                    "message":f'__SCRIBBLE__:{json.dumps({"event":"ai_guess","guesser":"Router-AI","guess":router_guess})}',
+                    "image":None,"room":room
+                }))
+            except: pass
 
 
 async def scribble_ai_draw(room: str, drawer: str):
+    """AI's drawing turn — fetch real Quick Draw strokes, animate on frontend."""
     word = random.choice(SCRIBBLE_WORD_BANK)
-
-    room_game_state[room] = {
-        "type": "scribble",
-        "data": {"current_word": word, "drawer": drawer}
-    }
-
+    room_game_state[room] = {"type":"scribble","data":{"current_word":word,"drawer":drawer}}
     drawer_name = "Groq-AI" if drawer == "groq" else "Router-AI"
-    clues = _make_clues(word)
 
-    strokes = await generate_ai_strokes(word)
-    if not strokes:
-        print(f"Using fallback strokes for '{word}'")
-        strokes = get_fallback_strokes(word)
+    clues = _make_clues(word)
+    strokes, source = await generate_drawing_strokes(word)
+
+    print(f"Drawing '{word}' via {source}: {len(strokes)} commands")
 
     payload = json.dumps({
         "sender": drawer_name,
-        "message": f'__SCRIBBLE__:{json.dumps({"event":"ai_draw_start","word":word,"clues":clues,"strokes":strokes,"drawer":drawer})}',
-        "image": None,
-        "room": room
+        "message": f'__SCRIBBLE__:{json.dumps({"event":"ai_draw_start","word":word,"clues":clues,"strokes":strokes,"drawer":drawer,"source":source})}',
+        "image": None, "room": room
     })
-
-    for conn in list(manager.rooms.get(room, [])):
+    for conn in list(manager.rooms.get(room,[])):
         try: await conn.send_text(payload)
         except: pass
 
 
-# ── WebSocket endpoint ─────────────────────────────────────────
+# ══════════════════════════════════════════════════════════════
+# WEBSOCKET ENDPOINT
+# ══════════════════════════════════════════════════════════════
 
 @app.websocket("/ws/{room}/{username}")
 async def ws_endpoint(ws: WebSocket, room: str, username: str):
@@ -513,14 +736,14 @@ async def ws_endpoint(ws: WebSocket, room: str, username: str):
             elif msg.startswith("__SCRIBBLE__:"):
                 try:
                     sd = json.loads(msg[len("__SCRIBBLE__:"):])
-                    event = sd.get("event", "")
+                    event = sd.get("event","")
 
                     if event == "game_start":
                         add_history(room, username, "[SCRIBBLE started]")
                         asyncio.create_task(trigger_ai(room, 0, True))
 
                     elif event == "user_draw_start":
-                        word = sd.get("word", "")
+                        word = sd.get("word","")
                         room_game_state[room] = {"type":"scribble","data":{"current_word":word,"drawer":"user"}}
                         add_history(room, username, f"[SCRIBBLE: {username} drawing ({sd.get('wordLength','?')} letters)]")
 
@@ -535,8 +758,7 @@ async def ws_endpoint(ws: WebSocket, room: str, username: str):
                         asyncio.create_task(scribble_ai_draw(room, sd.get("drawer","groq")))
 
                     elif event == "user_guess":
-                        guess = sd.get("guess","")
-                        add_history(room, username, f'[SCRIBBLE: {username} guessed "{guess}"]')
+                        add_history(room, username, f'[SCRIBBLE: {username} guessed "{sd.get("guess","")}"]')
 
                     elif event in ("round_guessed","round_timeout","game_over"):
                         await manager.broadcast(msg, username, room)

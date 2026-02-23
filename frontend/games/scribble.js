@@ -5,22 +5,22 @@
 // ═══════════════════════════════════════════
 
 const WORD_BANK = [
-    'apple', 'banana', 'car', 'dog', 'elephant', 'fish', 'guitar', 'house', 'jellyfish', 'kite',
-    'lion', 'moon', 'octopus', 'pizza', 'robot', 'sun', 'tree', 'umbrella', 'violin', 'whale', 'zebra',
-    'airplane', 'butterfly', 'castle', 'dinosaur', 'flower', 'ghost', 'helicopter', 'kangaroo', 'laptop',
-    'mushroom', 'ninja', 'owl', 'penguin', 'rainbow', 'spider', 'tornado', 'unicorn', 'volcano', 'dragon',
-    'rocket', 'camera', 'diamond', 'grapes', 'hammer', 'igloo', 'key', 'lamp', 'mountain', 'parachute',
-    'skateboard', 'telescope', 'star', 'sword', 'crown', 'anchor', 'balloon', 'candle', 'drum', 'flag',
-    'globe', 'heart', 'leaf', 'magnet', 'pencil', 'rose', 'snowflake', 'tent', 'cat', 'bird', 'frog',
-    'snake', 'turtle', 'rabbit', 'bear', 'bee', 'eagle', 'fox', 'giraffe', 'horse', 'koala', 'monkey',
-    'panda', 'shark', 'tiger', 'wolf', 'boat', 'bridge', 'bus', 'chair', 'clock', 'door', 'glasses',
-    'hat', 'ladder', 'mirror', 'piano', 'scissors', 'table', 'train', 'truck', 'basketball', 'football',
-    'trophy', 'fire', 'lightning', 'cloud', 'rain', 'snow', 'beach', 'forest', 'cave', 'river',
-    'lighthouse', 'burger', 'taco', 'sushi', 'cake', 'cookie', 'donut', 'popcorn', 'bicycle', 'compass',
-    'backpack', 'shoe', 'watch', 'bell', 'cherry', 'lemon', 'strawberry', 'pineapple', 'carrot', 'tomato',
-    'crab', 'deer', 'fan', 'window', 'medal', 'sandwich', 'coffee', 'bread', 'notebook', 'vase', 'drum',
-    'feather', 'envelope', 'jar', 'kettle', 'nest', 'orange', 'ring', 'windmill', 'wave', 'ufo',
-    'corn', 'pear', 'cheese', 'egg', 'soup', 'pie', 'barn', 'desert', 'sunrise', 'sunset',
+    'apple','banana','car','dog','elephant','fish','guitar','house','jellyfish','kite',
+    'lion','moon','octopus','pizza','robot','sun','tree','umbrella','violin','whale','zebra',
+    'airplane','butterfly','castle','dinosaur','flower','ghost','helicopter','kangaroo','laptop',
+    'mushroom','ninja','owl','penguin','rainbow','spider','tornado','unicorn','volcano','dragon',
+    'rocket','camera','diamond','grapes','hammer','igloo','key','lamp','mountain','parachute',
+    'skateboard','telescope','star','sword','crown','anchor','balloon','candle','drum','flag',
+    'globe','heart','leaf','magnet','pencil','rose','snowflake','tent','cat','bird','frog',
+    'snake','turtle','rabbit','bear','bee','eagle','fox','giraffe','horse','koala','monkey',
+    'panda','shark','tiger','wolf','boat','bridge','bus','chair','clock','door','glasses',
+    'hat','ladder','mirror','piano','scissors','table','train','truck','basketball','football',
+    'trophy','fire','lightning','cloud','rain','snow','beach','forest','cave','river',
+    'lighthouse','burger','taco','sushi','cake','cookie','donut','popcorn','bicycle','compass',
+    'backpack','shoe','watch','bell','cherry','lemon','strawberry','pineapple','carrot','tomato',
+    'crab','deer','fan','window','medal','sandwich','coffee','bread','notebook','vase','drum',
+    'feather','envelope','jar','kettle','nest','orange','ring','windmill','wave','ufo',
+    'corn','pear','cheese','egg','soup','pie','barn','desert','sunrise','sunset',
 ];
 
 const DRAWER_ORDER = ['user', 'groq', 'router'];
@@ -57,8 +57,8 @@ let sEraser = false;
 let sUndoStack = [];
 
 const SCOLORS = [
-    '#000000', '#ffffff', '#E53935', '#FF6D00', '#FDD835', '#43A047',
-    '#1E88E5', '#8E24AA', '#ff66cc', '#6D4C41', '#808080', '#00cccc'
+    '#000000','#ffffff','#E53935','#FF6D00','#FDD835','#43A047',
+    '#1E88E5','#8E24AA','#ff66cc','#6D4C41','#808080','#00cccc'
 ];
 
 // ── Scoring: word length × 15 base + time bonus ──
@@ -185,12 +185,12 @@ function scribbleBuildToolbar() {
         btn.dataset.size = s;
         const dot = document.createElement('div');
         dot.className = 'ssize-dot';
-        dot.style.cssText = `width:${[4, 7, 12][i]}px;height:${[4, 7, 12][i]}px`;
+        dot.style.cssText = `width:${[4,7,12][i]}px;height:${[4,7,12][i]}px`;
         btn.appendChild(dot); btn.onclick = () => sSetSize(s);
         tb.appendChild(btn);
     });
     tb.appendChild(Object.assign(document.createElement('div'), { className: 'stool-sep' }));
-    [['🧽 Eraser', sSetEraser], ['↩ Undo', sUndo], ['🗑 Clear', sClearCanvas]].forEach(([txt, fn]) => {
+    [['🧽 Eraser', sSetEraser],['↩ Undo', sUndo],['🗑 Clear', sClearCanvas]].forEach(([txt, fn]) => {
         const btn = document.createElement('button');
         btn.className = 'stool-btn'; btn.textContent = txt; btn.onclick = fn;
         tb.appendChild(btn);
@@ -256,7 +256,7 @@ function sExecuteStroke(cmd) {
                 if (cmd.fill) { sCtx.fillStyle = cmd.fill; sCtx.fill(); }
                 sCtx.stroke(); break;
         }
-    } catch (e) { console.warn('Stroke error:', e, cmd); }
+    } catch(e) { console.warn('Stroke error:', e, cmd); }
     sCtx.restore();
 }
 
@@ -265,7 +265,10 @@ function sPlayAiStrokes(strokes) {
     sCtx.fillStyle = '#ffffff';
     sCtx.fillRect(0, 0, sCanvas.width, sCanvas.height);
     let i = 0;
-    const delay = Math.max(120, Math.min(400, 7000 / strokes.length));
+    const isQuickDraw = strokes.length > 50;
+    const delay = isQuickDraw
+        ? Math.max(40, Math.min(120, 6000 / strokes.length))  // QD: fast fluid animation
+        : Math.max(200, Math.min(500, 7000 / strokes.length)); // LLM: deliberate strokes
     clearInterval(scribble.strokeAnimInterval);
     scribble.strokeAnimInterval = setInterval(() => {
         if (i >= strokes.length || !scribble.active) {
@@ -284,7 +287,7 @@ function sGetCompressedSnapshot() {
         tmp.height = Math.round(sCanvas.height * scale);
         tmp.getContext('2d').drawImage(sCanvas, 0, 0, tmp.width, tmp.height);
         return tmp.toDataURL('image/jpeg', 0.65);
-    } catch (e) { return null; }
+    } catch(e) { return null; }
 }
 
 // ══════════════════════════════
@@ -583,20 +586,30 @@ function handleScribbleMsg(data) {
 
             document.getElementById('scribble-result')?.classList.remove('show');
 
+            // Update drawer info with source badge
+            const drawerInfoEl = document.getElementById('scribble-drawer-info');
+            if (drawerInfoEl) {
+                const drawerLabel = d.drawer === 'groq' ? 'Groq-AI' : 'Router-AI';
+                const sourceBadge = d.source === 'quickdraw'
+                    ? '<span style="font-size:0.7em;opacity:0.6;margin-left:6px;">✏️ human drawing</span>'
+                    : '';
+                drawerInfoEl.innerHTML = `🎨 ${drawerLabel} is drawing...${sourceBadge}`;
+            }
+
             sStartTimer();
             sScheduleHints();
             if (scribble.strokes.length > 0) sPlayAiStrokes(scribble.strokes);
 
-            // Show clues in chat — first after 12s, then every 14s
+            // Show clues in chat — first after 14s, then every 15s
             clearInterval(scribble.aiClueInterval);
             const clueDelay = setTimeout(() => {
                 sShowNextClue();
-                scribble.aiClueInterval = setInterval(sShowNextClue, 14000);
-            }, 12000);
+                scribble.aiClueInterval = setInterval(sShowNextClue, 15000);
+            }, 14000);
             scribble.hintTimers.push(clueDelay);
         }
 
-    } catch (e) { console.warn('handleScribbleMsg error:', e); }
+    } catch(e) { console.warn('handleScribbleMsg error:', e); }
 }
 
 // Clues must NEVER contain the actual word
@@ -667,7 +680,7 @@ function sRevealLetter() {
 }
 
 function sUpdateScores() {
-    ['you', 'groq', 'router'].forEach(k => {
+    ['you','groq','router'].forEach(k => {
         const el = document.getElementById(`ss-${k}-pts`);
         if (el) el.textContent = scribble.scores[k];
     });
